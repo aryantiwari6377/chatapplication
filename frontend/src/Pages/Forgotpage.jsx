@@ -19,9 +19,9 @@ function Forgotpage() {
 
 
   return (
-    <div className=' md:mx-20  md:mt-6 '>
+    <div className=' md:mx-20  md:mt-6 lg:w-[1200px]'>
          <div className='text-end'>
-          <FontAwesomeIcon icon={faXmark} className='text-xl pr-2 pt-4 font-bold cursor-pointer' onClick={() => navigate(-1)}/>
+          <FontAwesomeIcon icon={faXmark} className='text-xl pr-2 pt-4 font-bold cursor-pointer lg:pr-[100px]' onClick={() => navigate(-1)}/>
         </div>
         <div className='md:flex md:justify-evenly'>
                  <div className='lg:w-[50%]'> <div className='w-[300px] h-[260px] mx-auto lg:w-[85%] lg:h-[360px]'><img src={forgot} className='h-full w-full'/></div>
