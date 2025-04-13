@@ -99,7 +99,7 @@ function Signup() {
   return (
     <>
       <ToastContainer />
-      <div className='flex flex-col justify-center gap-y-4 overflow-hidden h-[100vh] lg:justify-evenly lg:mt-24 lg:flex-row lg:w-[80%]'>
+      <div className='flex flex-col justify-center gap-y-4 overflow-hidden lg:mx-auto h-[100vh] lg:justify-evenly lg:mt-24 lg:flex-row lg:w-[80%]'>
         <div className='h-[240px] w-[90%] mx-auto md:w-[60%] lg:mx-0 lg:w-[36%] lg:h-[300px]'>
           <img src={img2} className='h-full w-full' />
         </div>

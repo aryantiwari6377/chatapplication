@@ -60,7 +60,7 @@ function Login() {
   
 
   return (
-    <div className='overflow-hidden h-[100vh] flex flex-col justify-center lg:flex-row lg:justify-evenly lg:mt-24 lg:w-[80%] h-[100vh]'>
+    <div className='overflow-hidden lg:mx-auto h-[100vh] flex flex-col justify-center lg:flex-row lg:justify-evenly lg:mt-24 lg:w-[80%] h-[100vh]'>
       <div className='h-[260px] w-[90%] md:w-[60%] mx-auto lg:mx-0 lg:w-[36%] lg:h-[300px]'>
         <img src={messageimg} className='h-full w-full' alt="Message"  loading="lazy" />
       </div>
