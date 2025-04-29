@@ -197,7 +197,7 @@ const Try = () => {
         </div>
         
         <div className={`${isSidebarExpanded ? "md:w-[80%]" : "md:w-[92%]"}   md:border-l-2 md:border-[rgb(85,95,94)]`}>
-          <div className="bg-[rgba(56,59,68,255)] flex flex-col gap-y-2 py-3 px-4">
+          <div className="flex flex-col gap-y-2 py-3 px-4">
             <div className="flex justify-between pt-4">
               <div className="flex gap-x-3">
                 <img
