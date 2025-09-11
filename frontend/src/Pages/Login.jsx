@@ -33,20 +33,21 @@ function Login() {
           navigate("/check");
         }, 3000);
       }
+    
     } catch (error) {
     
       console.log("Error object: ", error);
-  
+     
    
       if (error.response) {
         const { status, data } = error.response;
-  
+  console.log(error.response);
         if (status === 401) {
           toast.error(data.message || "Invalid credentials");
         } else if (status === 404) {
           toast.error(data.message || "User not found");
-        } else {
-          toast.error("An unexpected error occurred. Please try again.");
+        }else {
+          toast.error("User already exists.");
         }
       } else if (error.request) {
        
@@ -72,14 +73,14 @@ function Login() {
           onSubmit={handleform}
         >
           {({ isSubmitting }) => (
-            <Form className='p-2 flex flex-col gap-y-4 pt-8 px-12 md:w-[60%] md:mx-auto lg:w-auto'>   
+            <Form className='p-2 flex flex-col gap-y-4 pt-8 px-12 md:w-[60%] md:mx-auto lg:w-auto lg:px-3'>   
               <div className='flex items-center'>
                 <FontAwesomeIcon icon={faEnvelope} />
                 <Field
                   type="email"
                   name="email"
                   placeholder="Enter email"
-                  className='ml-2 outline-none'
+                  className='ml-2 outline-none w-[90%] md:w-[90%] p-1 rounded'
                 />
               </div>
               <ErrorMessage name="email" component="div" className="text-red-500 text-xs" />
@@ -90,13 +91,14 @@ function Login() {
                   type="password"
                   name="password"
                   placeholder="Enter password"
-                  className='ml-2 outline-none'
+                  className='ml-2 outline-none w-[90%] md:w-[90%] p-1 rounded'
                 />
               </div>
               <ErrorMessage name="password" component="div" className="text-red-500 text-xs" />
 
-              <p className='text-[14px] w-[76%] text-end lg:w-[92%]'>
-                <Link to="/forgotpassword">Forgot password?</Link>
+              <p className='text-[14px] text-end'>
+                {/* w-[76%] text-end lg:w-[92%] */}
+                <Link to="/forgotpassword" className='underline text-[#0ea5e9] cursor-pointer'>Forgot password?</Link>
               </p>
 
               <button

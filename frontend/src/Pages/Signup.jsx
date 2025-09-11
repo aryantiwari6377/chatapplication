@@ -76,25 +76,62 @@ function Signup() {
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
-  const handleform = async (e) => {
+  // const handleform = async (e) => {
      
-    e.preventDefault();
+  //   e.preventDefault();
     
-     if(password.length < 6){
-       toast("minimum 6 leangth password is required");
-       return;
-     }
+  //    if(password.length < 6){
+  //      toast("minimum 6 leangth password is required");
+  //      return;
+  //    }
 
+  //   const res = await signupservice(username, email, password);
+  //   console.log('res is', res); 
+
+  //   if (res.status === 201) {
+  //     toast.success('Account created successfully!');
+  //     navigate("/login");
+  //   }  else if (res.status === 400) {
+  //             toast.error("User already exists.");
+  //           } else {
+  //     toast.error('Something went wrong!');
+  //   }
+  // };
+
+  const handleform = async (e) => {
+  e.preventDefault();
+
+  if (password.length < 6) {
+    toast.error("Minimum 6 character password is required");
+    return;
+  }
+
+  try {
     const res = await signupservice(username, email, password);
-    console.log('res is', res); 
+    console.log("res is", res);
 
     if (res.status === 201) {
-      toast.success('Account created successfully!');
+      toast.success("Account created successfully!");
       navigate("/login");
-    } else {
-      toast.error('Something went wrong!');
     }
-  };
+     if (res.status === 400) {
+        toast.error("User already exists.");
+      } 
+  } catch (error) {
+ 
+    if (error.response) {
+      const { status, data } = error.response;
+      if (status === 400) {
+        toast.error("User already exists.");
+      } else {
+        toast.error(data.message || "Something went wrong!");
+      }
+    } else {
+      toast.error("Network error, please try again.");
+    }
+  }
+};
+
 
   return (
     <>

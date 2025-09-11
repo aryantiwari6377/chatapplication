@@ -312,7 +312,7 @@ const endCall = () => {
       </div>
 
       <div className="rounded-full w-[40px] h-[40px] bg-[rgba(41,45,54,255)]">
-        <FontAwesomeIcon icon={faPhone} className="text-[rgba(192,52,48,255)] text-xl mt-2"  onClick={startCall}/>
+        <FontAwesomeIcon icon={faPhone} className="text-[rgba(192,52,48,255)] text-xl mt-2 cursor-pointergit"  onClick={startCall}/>
       </div>
     </div>
 
@@ -415,10 +415,10 @@ const endCall = () => {
         onChange={handleTyping}
         className="bg-transparent outline-none text-white placeholder-gray-400 flex-1"
       />
-      <FontAwesomeIcon icon={faPaperclip} className="text-[rgba(192,52,48,255)] cursor-pointer text-xl" onClick={sendMessage} />
-      <FontAwesomeIcon icon={faCamera} className="text-[rgba(192,52,48,255)] cursor-pointer text-xl" onClick={sendMessage} />
-      <div className="bg-[rgba(192,52,48,255)] h-8 w-8 flex items-center justify-center rounded-full">
-        <FontAwesomeIcon icon={faMicrophone} className="text-xl" onClick={sendMessage} />
+      <FontAwesomeIcon icon={faPaperclip} className="text-[rgba(192,52,48,255)] cursor-pointer text-xl"  />
+      <FontAwesomeIcon icon={faCamera} className="text-[rgba(192,52,48,255)] cursor-pointer text-xl"  />
+      <div className="bg-[rgba(192,52,48,255)] h-8 w-8 flex items-center justify-center cursor-pointer rounded-full">
+        <FontAwesomeIcon icon={faMicrophone} className="text-xl" />
       </div>
       {/* <button
         className="bg-purple-800 text-white font-bold px-4 py-1 rounded-full text-[14px]"
@@ -426,7 +426,7 @@ const endCall = () => {
       >
         Send
       </button> */}
-      <img src={s2} className='w-[30px] h-[30px] rounded-full'/>
+      <img src={s2} className='w-[30px] h-[30px] rounded-full cursor-pointer' onClick={sendMessage}/>
     </div>
   </div>
 </div>
