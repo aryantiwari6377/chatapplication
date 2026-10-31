@@ -42,6 +42,7 @@ import {logout} from '../controllers/auth/logout.js';
 // const storage = multer.memoryStorage();
 // const upload = multer({ storage: storage });
 import {upload} from '../util/cloudinary.js';
+import { getPresignedUrl } from '../controllers/user/getpresignedurl.js';
 
 dotenv.config();
 
@@ -70,5 +71,8 @@ router.get('/profiledata',authenticationcheck, profiledata);
 
 // router.post('/upload-image', authenticationcheck,upload.single('image'), profileupload);
 router.post('/upload-image', authenticationcheck,upload.single('image'), profileupload);
+
+// S3 presigned-URL endpoint for chat file attachments
+router.post('/get-presigned-url', authenticationcheck, getPresignedUrl);
 
 export default router;

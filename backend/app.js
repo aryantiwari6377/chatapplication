@@ -101,29 +101,38 @@ socket.on('endCall', ({ to }) => {
 
 
 
-    socket.on('sendMessage', async ({ senderId, receiverId, messageText }) => {
+    socket.on('sendMessage', async ({ senderId, receiverId, messageText, fileUrl, fileType, fileName, messageType }) => {
       try {
-         
-          const message = new Message({
+          // Build message payload — support both text and file messages
+          const messagePayload = {
               sender: senderId,
               receiver: receiverId,
-              content: messageText,
-          });
+              content: messageText || '',
+              messageType: messageType || 'text',
+          };
+
+          // Attach file metadata if present
+          if (fileUrl) {
+              messagePayload.fileUrl = fileUrl;
+              messagePayload.fileType = fileType || null;
+              messagePayload.fileName = fileName || null;
+          }
+
+          const message = new Message(messagePayload);
           await message.save();
-  
+
           console.log("New message saved:", message);
-  
-          
+
           const senderSockets = userSockets[senderId] || [];
           senderSockets.forEach(socketId => {
               io.to(socketId).emit('receiveMessage', message);
           });
-  
+
           const receiverSockets = userSockets[receiverId] || [];
           receiverSockets.forEach(socketId => {
               io.to(socketId).emit('receiveMessage', message);
           });
-          
+
           console.log(`Message emitted to sender ${senderId} and receiver ${receiverId}`);
       } catch (error) {
           console.error("Error handling sendMessage:", error);

@@ -78,7 +78,7 @@ function Profile() {
   return (
     <div className="h-[100vh] overflow-hidden">
       <div className="mt-2 ml-2 flex flex-col bg-black rounded-full w-[32px] h-[32px] items-center justify-center lg:mt-10 lg:ml-12 lg:w-[34px] lg:h-[34px]">
-        <FontAwesomeIcon icon={faArrowLeft} className="text-white text-xl font-bold lg:text-[24px]" onClick={() => { navigate(-1) }} />
+        <FontAwesomeIcon icon={faArrowLeft} className="text-white text-xl font-bold lg:text-[24px] cursor-pointer" onClick={() => { navigate(-1) }} />
       </div>
 
       {loading ? (
@@ -88,7 +88,7 @@ function Profile() {
           <div className="my-3 flex items-center justify-center lg:w-[50%] lg:justify-end lg:pr-32 lg:gap-x-3">
             <img src={userimage || profile} className="w-[120px] h-[120px] rounded-full lg:w-[180px] lg:h-[180px]" alt="profile" />
             <div>
-              <FontAwesomeIcon icon={faPen} onClick={() => document.getElementById('profileImageInput').click()} />
+              <FontAwesomeIcon icon={faPen} className='cursor-pointer' onClick={() => document.getElementById('profileImageInput').click()} />
               <input
                 type="file"
                 id="profileImageInput"
