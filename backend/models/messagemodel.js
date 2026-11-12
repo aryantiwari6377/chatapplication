@@ -38,6 +38,18 @@ const messageSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  // Reply-to: stores a snapshot of the quoted message
+  replyTo: {
+    type: {
+      _id:         { type: String },
+      content:     { type: String, default: '' },
+      messageType: { type: String, default: 'text' },
+      fileName:    { type: String, default: null },
+      fileUrl:     { type: String, default: null },
+      senderName:  { type: String, default: '' },
+    },
+    default: null,
+  },
   timestamp: {
     type: Date,
     default: Date.now,

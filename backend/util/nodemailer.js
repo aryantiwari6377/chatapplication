@@ -1,18 +1,26 @@
-
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 
 dotenv.config();
 
-export const testaccount = nodemailer.createTransport({
+// Lazy singleton — created on first call so env vars are always populated
+let _transporter = null;
+
+export const getTransporter = () => {
+  if (_transporter) return _transporter;
+
+  _transporter = nodemailer.createTransport({
     service: "gmail",
-    port: 465,
-    secure: true,
     auth: {
-        user: process.env.GMAIL_USER, 
-        pass: process.env.GMAIL_PASS,  
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_PASS,
     },
-});
+  });
 
+  return _transporter;
+};
 
-// exports.testaccount = testaccount;
+// Keep old export name so nothing else breaks
+export const testaccount = {
+  sendMail: (opts) => getTransporter().sendMail(opts),
+};

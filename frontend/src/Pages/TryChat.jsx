@@ -1,7 +1,7 @@
 
-import { faArrowLeft, faCamera, faMicrophone, faPaperclip, faPhone,faPhoneSlash } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCamera, faMicrophone, faPaperclip, faPhone, faPhoneSlash, faReply, faShare } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import profile from "../images/profile.jpg";
 import { faFaceSmile } from '@fortawesome/free-regular-svg-icons';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -15,6 +15,7 @@ import s1 from '../images/send4.png';
 import s2 from '../images/send1.jpeg';
 import EmojiPicker from 'emoji-picker-react';
 import { uploadFileToS3 } from '../Services/user/uploadFile';
+import { friendlistservice } from '../Services/user/friendlist';
 
 window.process = process;
 
@@ -38,9 +39,42 @@ const TryChat = () => {
   const [stream, setStream] = useState(null);
   const [callAccepted, setCallAccepted] = useState(false);
   const [callEnded, setCallEnded] = useState(false);
+  const [callStatus, setCallStatus] = useState(null); // null | 'ringing' | 'connected' | 'ended'
   const [peerConnection, setPeerConnection] = useState(null);
+  const peerRef = useRef(null);
+  const isEndingCall = useRef(false);
+  const callStartTime = useRef(null);   // track when call connected for duration
   const myVideo = useRef(null);
   const userVideo = useRef(null);
+
+  // Call history — persisted in localStorage per chat pair
+  const historyKey = senderid && id ? `callHistory_${senderid}_${id}` : null;
+  const [callHistory, setCallHistory] = useState(() => {
+    try {
+      const key = `callHistory_${sessionStorage.getItem('senderId') || ''}_${window.location.pathname.split('/').pop()}`;
+      return JSON.parse(localStorage.getItem(key) || '[]');
+    } catch { return []; }
+  });
+  const [showHistory, setShowHistory] = useState(false);
+  // unread count — only missed/rejected INCOMING calls the user hasn't opened yet
+  const [unreadCallCount, setUnreadCallCount] = useState(0);
+
+  const addCallHistory = (entry) => {
+    setCallHistory((prev) => {
+      const updated = [entry, ...prev].slice(0, 50);
+      if (historyKey) localStorage.setItem(historyKey, JSON.stringify(updated));
+      // bump unread only for incoming missed/rejected — the receiver didn't initiate
+      if (entry.type === 'incoming' && (entry.status === 'missed' || entry.status === 'rejected')) {
+        setUnreadCallCount(c => c + 1);
+      }
+      return updated;
+    });
+  };
+
+  const openHistory = () => {
+    setShowHistory(true);
+    setUnreadCallCount(0); // clear badge when user opens the drawer
+  };
 const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
 const fileInputRef = useRef(null);
@@ -57,6 +91,78 @@ const cameraStreamRef = useRef(null);
 const [isRecording, setIsRecording] = useState(false);
 const mediaRecorderRef = useRef(null);
 const audioChunksRef = useRef([]);
+
+// Call events shown inline in the message list (like WhatsApp)
+const [callEvents, setCallEvents] = useState([]);
+
+const formatDuration = (secs) => {
+  if (!secs) return '';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+};
+
+const pushCallEvent = (entry) => {
+  setCallEvents(prev => [...prev, { ...entry, _isCallEvent: true, _id: Date.now() }]);
+};
+
+// ── Reply state ───────────────────────────────────────────────────────────────
+const [replyTo, setReplyTo] = useState(null); // { _id, content, messageType, fileName, fileUrl, senderName }
+const inputRef = useRef(null); // focus input after selecting reply
+
+// ── Forward state ─────────────────────────────────────────────────────────────
+const [forwardMsg, setForwardMsg]     = useState(null);  // message being forwarded
+const [friendsList, setFriendsList]   = useState([]);    // loaded on demand
+const [showForward, setShowForward]   = useState(false);
+const [forwardSearch, setForwardSearch] = useState('');
+
+// ── Call sound ───────────────────────────────────────────────────────────────
+const audioCtxRef      = useRef(null);
+const ringIntervalRef  = useRef(null);
+
+const getAudioCtx = () => {
+  if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtxRef.current;
+};
+
+// Play a single tone burst: freq Hz, duration ms, gap ms
+const playTone = (freq, dur, vol = 0.3) => {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur / 1000);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + dur / 1000);
+  } catch {}
+};
+
+// Outgoing ringback: "du-du ... du-du" pattern every 4 s
+const startRingback = () => {
+  stopRingSound();
+  const ring = () => { playTone(425, 400); setTimeout(() => playTone(425, 400), 500); };
+  ring();
+  ringIntervalRef.current = setInterval(ring, 4000);
+};
+
+// Incoming ringtone: higher, more urgent, every 2 s
+const startIncomingRing = () => {
+  stopRingSound();
+  const ring = () => {
+    playTone(880, 200); setTimeout(() => playTone(1100, 200), 250); setTimeout(() => playTone(880, 200), 500);
+  };
+  ring();
+  ringIntervalRef.current = setInterval(ring, 2000);
+};
+
+const stopRingSound = () => {
+  if (ringIntervalRef.current) { clearInterval(ringIntervalRef.current); ringIntervalRef.current = null; }
+};
 
 
   const userToken = sessionStorage.getItem('token');
@@ -108,20 +214,49 @@ const audioChunksRef = useRef([]);
       
       socketRef.current.on('incomingCall', ({ from, signalData }) => {
         setCall({ isReceivingCall: true, from, signalData });
-    });
+        startIncomingRing(); // receiver hears ringtone
+      });
 
-    socketRef.current.on('callAccepted', (signal) => {
-        peerConnection.signal(signal);
+      socketRef.current.on('callAccepted', (signal) => {
+        if (peerRef.current) peerRef.current.signal(signal);
         setCallAccepted(true);
-    });
+        setCallStatus('connected');
+        callStartTime.current = Date.now();
+        stopRingSound(); // caller's ringback stops when other side picks up
+      });
 
-    socketRef.current.on('callRejected', () => {
+      socketRef.current.on('callRejected', () => {
+        stopRingSound();
+        const entry = {
+          type: 'outgoing',
+          status: 'rejected',
+          with: user?.username || id,
+          time: new Date().toISOString(),
+          duration: null,
+        };
+        addCallHistory(entry);
+        pushCallEvent(entry);
+        setCallStatus(null);
         setCall(null);
-    });
+        cleanupCall(false);
+      });
 
-    socketRef.current.on('callEnded', () => {
-        endCall();
-    });
+      socketRef.current.on('callEnded', () => {
+        if (isEndingCall.current) return;
+        isEndingCall.current = true;
+        stopRingSound();
+        const dur = callStartTime.current ? Math.round((Date.now() - callStartTime.current) / 1000) : 0;
+        const entry = {
+          type: 'incoming',
+          status: 'ended',
+          with: user?.username || id,
+          time: new Date().toISOString(),
+          duration: dur,
+        };
+        addCallHistory(entry);
+        pushCallEvent(entry);
+        cleanupCall(false);
+      });
     }
 
     return () => {
@@ -135,6 +270,13 @@ const audioChunksRef = useRef([]);
   
   useEffect(() => {
   senderIdRef.current = senderid;
+  // reload call history now that we know senderid
+  if (senderid && id) {
+    try {
+      const key = `callHistory_${senderid}_${id}`;
+      setCallHistory(JSON.parse(localStorage.getItem(key) || '[]'));
+    } catch { setCallHistory([]); }
+  }
 }, [senderid]);
 
 
@@ -191,7 +333,9 @@ const audioChunksRef = useRef([]);
           fileName,
           messageType: msgType,
           timestamp: new Date().toISOString(),
+          ...(replyTo ? { replyTo } : {}),
         });
+        setReplyTo(null);
       } catch (err) {
         setUploadProgress(null);
         console.error('File upload failed:', err);
@@ -207,10 +351,12 @@ const audioChunksRef = useRef([]);
       messageText: newMessage,
       senderId: senderid,
       timestamp: new Date().toISOString(),
+      ...(replyTo ? { replyTo } : {}),
     };
     setMessages((prevMessages) => [...prevMessages, messageData]);
     socketRef.current.emit('sendMessage', messageData);
     setNewMessage('');
+    setReplyTo(null); // clear reply after sending
   };
 
 
@@ -274,72 +420,133 @@ const audioChunksRef = useRef([]);
 
   
 
-  //new
- 
-  const startCall = async () => {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        setStream(stream);
-        if (myVideo.current) myVideo.current.srcObject = stream;
-
-        const peer = new SimplePeer({ initiator: true, trickle: false, stream });
-
-        peer.on('signal', (signalData) => {
-            socketRef.current.emit('callUser', { receiverId: id, signalData, from: userToken });
-        });
-
-        peer.on('stream', (userStream) => {
-            if (userVideo.current) userVideo.current.srcObject = userStream;
-        });
-
-        setPeerConnection(peer);
-    } catch (error) {
-        console.error("Error starting call:", error);
+  // ── Shared call cleanup ───────────────────────────────────────────────────
+  // emitEnd: true = we are the one ending (emit socket), false = we received the end event
+  const cleanupCall = (emitEnd = false) => {
+    stopRingSound();
+    if (peerRef.current) {
+      peerRef.current.destroy();
+      peerRef.current = null;
     }
-};
-
-const answerCall = async () => {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        setStream(stream);
-        if (myVideo.current) myVideo.current.srcObject = stream;
-
-        const peer = new SimplePeer({ initiator: false, trickle: false, stream });
-
-        peer.on('signal', (signal) => {
-            socketRef.current.emit('answerCall', { to: call.from, signal });
-        });
-
-        peer.on('stream', (userStream) => {
-            if (userVideo.current) userVideo.current.srcObject = userStream;
-        });
-
-        peer.signal(call.signalData);
-        setCallAccepted(true);
-        setPeerConnection(peer);
-    } catch (error) {
-        console.error("Error answering call:", error);
-    }
-};
-
-const rejectCall = () => {
-    socketRef.current.emit('rejectCall', { to: call.from });
-    setCall(null);
-};
-
-const endCall = () => {
-    if (peerConnection) {
-        peerConnection.destroy();
-    }
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-    }
-    socketRef.current.emit('endCall', { to: id });
+    setPeerConnection(null);
+    setStream((s) => {
+      if (s) s.getTracks().forEach((t) => t.stop());
+      return null;
+    });
     setCall(null);
     setCallAccepted(false);
-    setCallEnded(true);
-    setPeerConnection(null);
-};
+    setCallStatus('ended');
+    callStartTime.current = null;
+    setTimeout(() => {
+      setCallStatus(null);
+      setCallEnded(false);
+      isEndingCall.current = false;
+    }, 2500);
+  };
+
+  const startCall = async () => {
+    if (callStatus) return;
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setStream(mediaStream);
+      if (myVideo.current) myVideo.current.srcObject = mediaStream;
+
+      const peer = new SimplePeer({ initiator: true, trickle: false, stream: mediaStream });
+      peerRef.current = peer;
+      setPeerConnection(peer);
+      setCallStatus('ringing');
+      startRingback(); // caller hears ringback tone
+
+      peer.on('signal', (signalData) => {
+        socketRef.current.emit('callUser', {
+          receiverId: id,
+          signalData,
+          from: senderIdRef.current,
+        });
+      });
+
+      peer.on('stream', (userStream) => {
+        if (userVideo.current) userVideo.current.srcObject = userStream;
+      });
+
+      peer.on('error', (err) => console.error('Peer error:', err));
+    } catch (error) {
+      console.error('Error starting call:', error);
+      setCallStatus(null);
+      stopRingSound();
+      alert('Could not access camera/microphone. Please check permissions.');
+    }
+  };
+
+  const answerCall = async () => {
+    stopRingSound(); // stop incoming ring when accepted
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setStream(mediaStream);
+      if (myVideo.current) myVideo.current.srcObject = mediaStream;
+
+      const peer = new SimplePeer({ initiator: false, trickle: false, stream: mediaStream });
+      peerRef.current = peer;
+      setPeerConnection(peer);
+
+      peer.on('signal', (signal) => {
+        socketRef.current.emit('answerCall', { to: call.from, signal });
+      });
+
+      peer.on('stream', (userStream) => {
+        if (userVideo.current) userVideo.current.srcObject = userStream;
+      });
+
+      peer.on('error', (err) => console.error('Peer error:', err));
+
+      peer.signal(call.signalData);
+      setCallAccepted(true);
+      setCallStatus('connected');
+      callStartTime.current = Date.now();
+    } catch (error) {
+      console.error('Error answering call:', error);
+    }
+  };
+
+  const rejectCall = () => {
+    stopRingSound();
+    socketRef.current.emit('rejectCall', { to: call.from });
+    const entry = {
+      type: 'incoming',
+      status: 'rejected',
+      with: user?.username || id,
+      time: new Date().toISOString(),
+      duration: null,
+    };
+    addCallHistory(entry);
+    pushCallEvent(entry);
+    setCall(null);
+    setCallStatus(null);
+  };
+
+  const endCall = () => {
+    isEndingCall.current = true;
+    stopRingSound();
+    socketRef.current.emit('endCall', { to: id });
+    const dur = callStartTime.current ? Math.round((Date.now() - callStartTime.current) / 1000) : 0;
+    const entry = {
+      type: 'outgoing',
+      status: callAccepted ? 'ended' : 'cancelled',
+      with: user?.username || id,
+      time: new Date().toISOString(),
+      duration: callAccepted ? dur : null,
+    };
+    addCallHistory(entry);
+    pushCallEvent(entry);
+    cleanupCall(false);
+  };
+
+  // callAccepted socket fires → caller transitions from ringing → connected
+  // handled in the socket listener above via peerRef; also update callStatus
+  const onCallConnected = () => {
+    setCallStatus('connected');
+    callStartTime.current = Date.now();
+  };
 
 
 
@@ -351,6 +558,36 @@ const endCall = () => {
 
 
 
+
+  // ── Forward message ───────────────────────────────────────────────────────
+  const openForward = async (msg) => {
+    setForwardMsg(msg);
+    setForwardSearch('');
+    if (friendsList.length === 0) {
+      try {
+        const res = await friendlistservice();
+        setFriendsList(res.data?.activeFriends || []);
+      } catch {}
+    }
+    setShowForward(true);
+  };
+
+  const sendForward = (targetFriendId) => {
+    if (!forwardMsg || !socketRef.current) return;
+    // Forward as a copy: same content/file but no replyTo, marked forwarded
+    socketRef.current.emit('sendMessage', {
+      senderId: senderid,
+      receiverId: targetFriendId,
+      messageText: forwardMsg.content || forwardMsg.messageText || '',
+      fileUrl: forwardMsg.fileUrl || null,
+      fileType: forwardMsg.fileType || null,
+      fileName: forwardMsg.fileName || null,
+      messageType: forwardMsg.messageType || 'text',
+      timestamp: new Date().toISOString(),
+    });
+    setShowForward(false);
+    setForwardMsg(null);
+  };
 
 // ── Camera handlers ───────────────────────────────────────────────────────────
   const openCamera = async () => {
@@ -455,7 +692,7 @@ const endCall = () => {
   };
 
   return (
-   
+  <>
   <div className="bg-[rgba(27,32,38,255)] min-h-screen text-white md:flex">
   {/* Left Section */}
   <div className="hidden md:block md:w-[50%] lg:w-[60%]">
@@ -470,7 +707,7 @@ const endCall = () => {
   </div>
 
   {/* Right Section */}
-  <div className="md:w-[50%] lg:w-[40%] flex flex-col h-screen">
+  <div className="md:w-[50%] lg:w-[40%] flex flex-col h-screen relative">
     {/* Header */}
     <div className="bg-[rgba(56,59,68,255)] flex justify-between px-3 py-2">
       <div className="rounded-full w-[40px] h-[40px] bg-[rgba(41,45,54,255)]" onClick={Back}>
@@ -486,27 +723,188 @@ const endCall = () => {
         </div>
       </div>
 
-      <div className="rounded-full w-[40px] h-[40px] bg-[rgba(41,45,54,255)]">
-        <FontAwesomeIcon icon={faPhone} className="text-[rgba(192,52,48,255)] text-xl mt-2 cursor-pointer"  onClick={startCall}/>
+      <div className="flex items-center gap-2">
+        {/* Call button */}
+        <div className="rounded-full w-[40px] h-[40px] bg-[rgba(41,45,54,255)] flex items-center justify-center cursor-pointer">
+          <FontAwesomeIcon
+            icon={faPhone}
+            className="text-[rgba(192,52,48,255)] text-lg"
+            onClick={startCall}
+            title="Start video call"
+          />
+        </div>
+        {/* Call history button */}
+        <div
+          className="rounded-full w-[40px] h-[40px] bg-[rgba(41,45,54,255)] flex items-center justify-center cursor-pointer relative"
+          onClick={openHistory}
+          title="Call history"
+        >
+          <FontAwesomeIcon icon={faPhone} className="text-[rgba(192,52,48,255)] text-sm rotate-[135deg]" />
+          {unreadCallCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+              {unreadCallCount > 9 ? '9+' : unreadCallCount}
+            </span>
+          )}
+        </div>
       </div>
     </div>
 
-   {/* call */}
-   {call?.isReceivingCall && !callAccepted && (
-                <div className="incoming-call">
-                    <p>Incoming call...</p>
-                    <button onClick={answerCall}>Accept</button>
-                    <button onClick={rejectCall}>Reject</button>
-                </div>
-            )}
+   {/* ── Outgoing call — Ringing screen (shown to CALLER) ─────────────── */}
+   {callStatus === 'ringing' && (
+     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+       <div className="bg-[rgba(41,45,54,255)] rounded-2xl p-8 flex flex-col items-center gap-5 shadow-2xl w-[300px]">
+         <img src={profile} alt="" className="w-20 h-20 rounded-full border-4 border-[rgba(192,52,48,255)]" />
+         <p className="text-white font-semibold text-lg">{user?.username}</p>
+         <p className="text-gray-400 text-sm animate-pulse">Ringing…</p>
+         {/* Animated ring rings */}
+         <div className="relative flex items-center justify-center w-16 h-16">
+           <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-30 animate-ping"></span>
+           <div className="relative w-16 h-16 rounded-full bg-[rgba(192,52,48,255)] flex items-center justify-center">
+             <FontAwesomeIcon icon={faPhone} className="text-white text-2xl" />
+           </div>
+         </div>
+         <button
+           onClick={endCall}
+           className="mt-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg transition"
+           title="Cancel call"
+         >
+           <FontAwesomeIcon icon={faPhoneSlash} className="text-xl" />
+         </button>
+         <p className="text-gray-500 text-xs">Tap red to cancel</p>
+       </div>
+     </div>
+   )}
 
-            {callAccepted && !callEnded && (
-                <div className="video-call">
-                    <video ref={myVideo} autoPlay playsInline />
-                    <video ref={userVideo} autoPlay playsInline />
-                    <FontAwesomeIcon icon={faPhoneSlash} className="end-call" onClick={endCall} />
-                </div>
-            )}
+   {/* ── Incoming call banner (shown to RECEIVER) ─────────────────────── */}
+   {call?.isReceivingCall && !callAccepted && callStatus !== 'ringing' && (
+     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+       <div className="bg-[rgba(41,45,54,255)] rounded-2xl p-8 flex flex-col items-center gap-5 shadow-2xl w-[300px]">
+         <img src={profile} alt="" className="w-20 h-20 rounded-full border-4 border-green-500" />
+         <p className="text-white font-semibold text-lg">{user?.username}</p>
+         <p className="text-gray-400 text-sm animate-pulse">Incoming video call…</p>
+         <div className="flex gap-8 mt-2">
+           <div className="flex flex-col items-center gap-1">
+             <button
+               onClick={rejectCall}
+               className="bg-red-600 hover:bg-red-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg transition"
+               title="Decline"
+             >
+               <FontAwesomeIcon icon={faPhoneSlash} className="text-xl" />
+             </button>
+             <span className="text-gray-400 text-xs">Decline</span>
+           </div>
+           <div className="flex flex-col items-center gap-1">
+             <button
+               onClick={answerCall}
+               className="bg-green-500 hover:bg-green-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg transition"
+               title="Accept"
+             >
+               <FontAwesomeIcon icon={faPhone} className="text-xl" />
+             </button>
+             <span className="text-gray-400 text-xs">Accept</span>
+           </div>
+         </div>
+       </div>
+     </div>
+   )}
+
+   {/* ── Active video call overlay ─────────────────────────────────────── */}
+   {callStatus === 'connected' && (
+     <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
+       <video ref={userVideo} autoPlay playsInline className="w-full h-full object-cover" />
+       <video
+         ref={myVideo} autoPlay playsInline muted
+         className="absolute bottom-24 right-4 w-32 h-44 object-cover rounded-xl border-2 border-white shadow-lg"
+       />
+       <button
+         onClick={endCall}
+         className="absolute bottom-6 bg-red-600 hover:bg-red-700 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-xl transition"
+         title="End call"
+       >
+         <FontAwesomeIcon icon={faPhoneSlash} className="text-2xl" />
+       </button>
+     </div>
+   )}
+
+   {/* ── Call ended toast ─────────────────────────────────────────────── */}
+   {callStatus === 'ended' && (
+     <div className="fixed inset-x-0 top-4 z-50 flex justify-center pointer-events-none">
+       <div className="bg-gray-800 text-white text-sm px-6 py-2 rounded-full shadow-lg">
+         Call ended
+       </div>
+     </div>
+   )}
+
+   {/* ── Call History full panel ───────────────────────────────────────── */}
+   {showHistory && (
+     <div className="absolute inset-0 z-40 bg-[rgba(27,32,38,255)] flex flex-col">
+       {/* Panel header */}
+       <div className="bg-[rgba(56,59,68,255)] flex items-center gap-3 px-4 py-3">
+         <button onClick={() => setShowHistory(false)} className="text-[rgba(192,52,48,255)] text-xl">
+           <FontAwesomeIcon icon={faArrowLeft} />
+         </button>
+         <span className="text-white font-semibold text-base">Call History</span>
+       </div>
+
+       {/* Log list */}
+       <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+         {callHistory.length === 0 ? (
+           <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-500">
+             <FontAwesomeIcon icon={faPhone} className="text-4xl opacity-30" />
+             <p className="text-sm">No calls yet</p>
+           </div>
+         ) : (
+           callHistory.map((entry, i) => {
+             const isMissed  = entry.status === 'rejected' || entry.status === 'missed';
+             const isCancelled = entry.status === 'cancelled';
+             const isEnded   = entry.status === 'ended';
+             const isOut     = entry.type === 'outgoing';
+
+             const arrowColor = isMissed ? 'text-red-400' : isCancelled ? 'text-yellow-400' : 'text-green-400';
+             const arrowIcon  = isOut ? '↗' : '↙';
+             const statusText = isMissed    ? (isOut ? 'Rejected' : 'Missed call')
+                              : isCancelled ? 'Cancelled'
+                              : isEnded     ? `Video call · ${formatDuration(entry.duration)}`
+                              : '';
+
+             const callDate  = new Date(entry.time);
+             const isToday   = callDate.toDateString() === new Date().toDateString();
+             const dateStr   = isToday
+               ? callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+               : callDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
+
+             return (
+               <div key={i} className="flex items-center gap-4 px-4 py-4 border-b border-[rgba(56,59,68,255)] hover:bg-[rgba(41,45,54,255)] transition">
+                 {/* Avatar */}
+                 <img src={profile} alt="" className="w-11 h-11 rounded-full flex-shrink-0" />
+
+                 {/* Info */}
+                 <div className="flex-1 min-w-0">
+                   <p className="text-white text-sm font-medium">{entry.with}</p>
+                   <p className={`text-xs flex items-center gap-1 mt-0.5 ${arrowColor}`}>
+                     <span>{arrowIcon}</span>
+                     <span>{statusText}</span>
+                   </p>
+                 </div>
+
+                 {/* Time + call-back */}
+                 <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                   <span className="text-gray-500 text-xs">{dateStr}</span>
+                   <button
+                     onClick={() => { setShowHistory(false); startCall(); }}
+                     className="w-8 h-8 rounded-full bg-[rgba(56,59,68,255)] flex items-center justify-center hover:bg-[rgba(192,52,48,255)] transition"
+                     title="Call back"
+                   >
+                     <FontAwesomeIcon icon={faPhone} className="text-[rgba(192,52,48,255)] hover:text-white text-xs" />
+                   </button>
+                 </div>
+               </div>
+             );
+           })
+         )}
+       </div>
+     </div>
+   )}
 
 
 
@@ -516,120 +914,156 @@ const endCall = () => {
       className="flex-1 overflow-y-auto pb-[30px]"
       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
     >  
-      {/* <ul>  
-        {groupedMessages.map((group, index) => (
-          <div key={index}>
-            <p className="text-xs text-white mx-3 mt-4">{group.date}</p>
-     
-            {group.messages.map((message, idx) => (
-               
-           
-              <li key={idx} className="mx-3 mt-4 rounded-md"  >
-                <p
-                  className={`text-sm ${
-                    message.sender === senderid
-                      ? 'self-end text-right'  
-                      : 'self-start text-yellow-500 text-left'
-                  }`}
-                > 
-                  {message.content}  {message.messageText}
-                  <span className="ml-2 text-xs text-white">
-                    {new Date(message.timestamp).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </p>
-              </li>
-            ))}
-          </div>
-        ))}
-      </ul> */}
       <ul>  
-  {groupedMessages.map((group, index) => (
-    <li key={index} className="list-none">
-      <p className="text-xs text-white mx-3 mt-4">{group.date}</p>
+  {/* Merge messages + call events, sort by timestamp, group by date */}
+  {(() => {
+    const allItems = [
+      ...messages.map(m => ({ ...m, _isCallEvent: false })),
+      ...callEvents,
+    ].sort((a, b) => new Date(a.timestamp ?? a.time) - new Date(b.timestamp ?? b.time));
 
-      {group.messages.map((message, idx) => {
-        const isLastMessage =
-          index === groupedMessages.length - 1 && idx === group.messages.length - 1;
+    const grouped = [];
+    let currentDate = '';
+    allItems.forEach((item) => {
+      const ts = item.timestamp ?? item.time;
+      const dateLabel = formatTimestamp(ts);
+      if (dateLabel !== currentDate) {
+        currentDate = dateLabel;
+        grouped.push({ date: currentDate, items: [item] });
+      } else {
+        grouped[grouped.length - 1].items.push(item);
+      }
+    });
 
-        return (
-          <li key={idx} className="mx-3 mt-4 rounded-md" ref={isLastMessage ? lastMessageRef : null}>
-            <div
-              className={`text-sm flex flex-col ${
-                String(message.senderId ?? message.sender) === String(senderid)
-                  ? 'items-end'
-                  : 'items-start'
-              }`}
-            >
-              {/* ── Image attachment ─────────────────────────────────── */}
-              {message.messageType === 'image' && message.fileUrl && (
-                <a href={message.fileUrl} target="_blank" rel="noreferrer">
-                  <img
-                    src={message.fileUrl}
-                    alt={message.fileName || 'attachment'}
-                    className="max-w-[220px] max-h-[220px] rounded-lg object-cover border border-gray-600 cursor-pointer"
-                  />
-                </a>
-              )}
+    return grouped.map((group, gIdx) => (
+      <li key={gIdx} className="list-none">
+        <p className="text-xs text-gray-400 text-center mx-3 mt-4 mb-2">{group.date}</p>
 
-              {/* ── Generic file (PDF, DOCX, TXT …) ─────────────────── */}
-              {message.messageType === 'file' && message.fileUrl && (
-                <a
-                  href={message.fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition ${
-                    String(message.senderId ?? message.sender) === String(senderid)
-                      ? 'bg-[rgba(56,59,68,255)] text-white hover:bg-[rgba(80,84,96,255)]'
-                      : 'bg-[rgba(56,59,68,255)] text-yellow-500 hover:bg-[rgba(80,84,96,255)]'
-                  }`}
-                >
-                  <span>📎</span>
-                  <span className="underline truncate max-w-[180px]">
-                    {message.fileName || 'Download file'}
+        {group.items.map((item, idx) => {
+          const isLast = gIdx === grouped.length - 1 && idx === group.items.length - 1;
+
+          /* ── Call event bubble (WhatsApp-style centred system message) ── */
+          if (item._isCallEvent) {
+            const isMissed   = item.status === 'rejected' || item.status === 'missed';
+            const isCancelled = item.status === 'cancelled';
+            const textColor  = isMissed ? 'text-red-400' : isCancelled ? 'text-yellow-400' : 'text-green-400';
+            const label      = isMissed    ? (item.type === 'outgoing' ? '📞 Rejected' : '📞 Missed call')
+                             : isCancelled ? '📞 Cancelled'
+                             : `📞 Video call · ${formatDuration(item.duration)}`;
+            return (
+              <li key={`ce-${idx}`} className="list-none flex justify-center my-2" ref={isLast ? lastMessageRef : null}>
+                <div className={`flex items-center gap-2 bg-[rgba(41,45,54,255)] border border-[rgba(56,59,68,255)] rounded-full px-4 py-1.5 text-xs ${textColor}`}>
+                  <span>{label}</span>
+                  <span className="text-gray-500 text-[10px]">
+                    {new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
-                </a>
-              )}
-
-              {/* ── Voice message ─────────────────────────────────────── */}
-              {message.messageType === 'audio' && message.fileUrl && (
-                <div className={`flex flex-col gap-1 px-3 py-2 rounded-lg text-xs ${
-                  String(message.senderId ?? message.sender) === String(senderid)
-                    ? 'bg-[rgba(56,59,68,255)] text-white'
-                    : 'bg-[rgba(56,59,68,255)] text-yellow-500'
-                }`}>
-                  <span className="mb-1">🎤 Voice message</span>
-                  <audio controls src={message.fileUrl} className="h-8 w-48" />
                 </div>
-              )}
+              </li>
+            );
+          }
 
-              {/* ── Plain text ───────────────────────────────────────── */}
-              {(message.messageType === 'text' || !message.messageType) && (
-                <span
-                  className={
-                    String(message.senderId ?? message.sender) === String(senderid)
-                      ? 'text-white'
-                      : 'text-yellow-500'
-                  }
-                >
-                  {message.content || message.messageText}
+          /* ── Normal message bubble ─────────────────────────────────── */
+          const isOwn = String(item.senderId ?? item.sender) === String(senderid);
+          return (
+            <li key={`msg-${idx}`} className="mx-3 mt-4 rounded-md list-none group" ref={isLast ? lastMessageRef : null}>
+              <div className={`text-sm flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+
+                {/* ── Reply/Forward action buttons (appear on hover) ── */}
+                <div className={`flex items-center gap-2 mb-1 opacity-0 group-hover:opacity-100 transition-opacity ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <button
+                    onClick={() => {
+                      setReplyTo({
+                        _id: item._id || item.timestamp,
+                        content: item.content || item.messageText || '',
+                        messageType: item.messageType || 'text',
+                        fileName: item.fileName || null,
+                        fileUrl: item.fileUrl || null,
+                        senderName: isOwn ? 'You' : (user?.username || 'Them'),
+                      });
+                      inputRef.current?.focus();
+                    }}
+                    className="text-gray-400 hover:text-white text-xs flex items-center gap-1 bg-[rgba(41,45,54,255)] px-2 py-1 rounded-full"
+                    title="Reply"
+                  >
+                    <FontAwesomeIcon icon={faReply} className="text-[10px]" />
+                    <span>Reply</span>
+                  </button>
+                  <button
+                    onClick={() => openForward(item)}
+                    className="text-gray-400 hover:text-white text-xs flex items-center gap-1 bg-[rgba(41,45,54,255)] px-2 py-1 rounded-full"
+                    title="Forward"
+                  >
+                    <FontAwesomeIcon icon={faShare} className="text-[10px]" />
+                    <span>Forward</span>
+                  </button>
+                </div>
+
+                {/* ── Quoted reply bubble (if this message is a reply) ── */}
+                {item.replyTo && (
+                  <div className={`mb-1 px-2 py-1.5 rounded-lg border-l-4 max-w-[200px] text-xs ${
+                    isOwn
+                      ? 'border-[rgba(192,52,48,255)] bg-[rgba(56,59,68,255)] text-gray-300'
+                      : 'border-yellow-500 bg-[rgba(56,59,68,255)] text-gray-300'
+                  }`}>
+                    <p className={`font-semibold text-[10px] mb-0.5 ${isOwn ? 'text-[rgba(192,52,48,255)]' : 'text-yellow-400'}`}>
+                      {item.replyTo.senderName}
+                    </p>
+                    <p className="truncate">
+                      {item.replyTo.messageType === 'image' ? '📷 Photo'
+                       : item.replyTo.messageType === 'audio' ? '🎤 Voice message'
+                       : item.replyTo.messageType === 'file'  ? `📎 ${item.replyTo.fileName || 'File'}`
+                       : (item.replyTo.content || 'Message')}
+                    </p>
+                  </div>
+                )}
+
+                {/* Image */}
+                {item.messageType === 'image' && item.fileUrl && (
+                  <a href={item.fileUrl} target="_blank" rel="noreferrer">
+                    <img src={item.fileUrl} alt={item.fileName || 'attachment'}
+                      className="max-w-[220px] max-h-[220px] rounded-lg object-cover border border-gray-600 cursor-pointer" />
+                  </a>
+                )}
+
+                {/* File */}
+                {item.messageType === 'file' && item.fileUrl && (
+                  <a href={item.fileUrl} target="_blank" rel="noreferrer"
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition ${
+                      isOwn ? 'bg-[rgba(56,59,68,255)] text-white hover:bg-[rgba(80,84,96,255)]'
+                            : 'bg-[rgba(56,59,68,255)] text-yellow-500 hover:bg-[rgba(80,84,96,255)]'
+                    }`}>
+                    <span>📎</span>
+                    <span className="underline truncate max-w-[180px]">{item.fileName || 'Download file'}</span>
+                  </a>
+                )}
+
+                {/* Audio */}
+                {item.messageType === 'audio' && item.fileUrl && (
+                  <div className={`flex flex-col gap-1 px-3 py-2 rounded-lg text-xs ${
+                    isOwn ? 'bg-[rgba(56,59,68,255)] text-white' : 'bg-[rgba(56,59,68,255)] text-yellow-500'
+                  }`}>
+                    <span className="mb-1">🎤 Voice message</span>
+                    <audio controls src={item.fileUrl} className="h-8 w-48" />
+                  </div>
+                )}
+
+                {/* Text */}
+                {(item.messageType === 'text' || !item.messageType) && (
+                  <span className={isOwn ? 'text-white' : 'text-yellow-500'}>
+                    {item.content || item.messageText}
+                  </span>
+                )}
+
+                <span className="text-xs text-gray-400 mt-1">
+                  {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
-              )}
-
-              <span className="text-xs text-gray-400 mt-1">
-                {new Date(message.timestamp).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
-            </div>
-          </li>
-        );
-      })}
-    </li>
-  ))}
+              </div>
+            </li>
+          );
+        })}
+      </li>
+    ));
+  })()}
 </ul>
 
     </div>
@@ -774,7 +1208,7 @@ const endCall = () => {
   </div>
 )}
 </div>
-
+  </>
   );
 };
 

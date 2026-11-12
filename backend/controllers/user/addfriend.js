@@ -53,7 +53,8 @@ export const requestaction = async (req, res) => {
    const {id} = req.user;
     const receiverId = id;
     const { value,  senderId } = req.body;
-    console.log("id is correct",receiverId);
+    console.log("----------->>>>>>>>>",req.body);
+    console.log("id is correct",receiverId, "senderId",senderId);
     if (!receiverId || !senderId || !value) {
       return res.status(400).json({ message: "Invalid input" });
     }
@@ -65,9 +66,10 @@ export const requestaction = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-   
+   console.log("{{{{{{{",receiver,senderId);
+    console.log("receiver.friends userId values:", receiver.friends.map(f => ({ userId: f.userId?.toString(), status: f.status })));
     const receiverFriendRequest = receiver.friends.find(friend => friend.userId.toString() === senderId);
-
+ console.log("}}}}}}}}}}}}}",receiverFriendRequest);
     if (!receiverFriendRequest) {
       return res.status(400).json({ message: "No pending request found" });
     }

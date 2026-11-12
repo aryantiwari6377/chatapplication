@@ -15,6 +15,7 @@ import vector75right from '../images/Vector 75right.svg';
 import { loadingHandle ,friendList} from '../Redux/slices/loadingSlice';
 import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
+import { io } from 'socket.io-client';
 
 
 const Try = () => {
@@ -51,11 +52,11 @@ const Try = () => {
   }
 
   const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
     const date = new Date(timestamp);
     const hours = date.getHours();
     const minutes = date.getMinutes();
-    const time = `${hours}:${minutes < 10 ? '0' + minutes : minutes}`;
-    return time;
+    return `${hours}:${minutes < 10 ? '0' + minutes : minutes}`;
   };
    
   // const friendlist = async () => {
@@ -128,21 +129,18 @@ const Try = () => {
   const frienddetail = async (friendid) => {
     try {
       const res = await latestmessageservice(friendid);
-      if (res.status === 204) {
-        setFriendMessages((prevMessages) => [
-          ...prevMessages,
-          { friendId: friendid, message: 'Be first', timestamp: 'no' },
-        ]);
+      const data = res.data;
+
+      if (data.empty) {
+        setFriendMessages((prev) => {
+          const filtered = prev.filter((m) => m.friendId !== friendid);
+          return [...filtered, { friendId: friendid, message: 'Say hi 👋', timestamp: null }];
+        });
       } else {
-        const latestMessage = res.data;
-        setFriendMessages((prevMessages) => [
-          ...prevMessages,
-          {
-            friendId: friendid,
-            message: latestMessage.content,
-            timestamp: latestMessage.timestamp,
-          },
-        ]);
+        setFriendMessages((prev) => {
+          const filtered = prev.filter((m) => m.friendId !== friendid);
+          return [...filtered, { friendId: friendid, message: data.content, timestamp: data.timestamp }];
+        });
       }
     } catch (error) {
       console.error('Error fetching latest message:', error);
@@ -182,6 +180,33 @@ const Try = () => {
       });
     }
   }, [friendsList]);
+
+  // Real-time: update the latest message preview when a new message arrives
+  useEffect(() => {
+    const userToken = sessionStorage.getItem('token');
+    if (!userToken) return;
+
+    const socket = io('http://localhost:5000', { query: { token: userToken } });
+
+    socket.on('receiveMessage', (message) => {
+      const friendId = message.sender ?? message.senderId;
+      if (!friendId) return;
+
+      let preview = message.content || '';
+      if (!preview) {
+        if (message.messageType === 'image') preview = '📷 Photo';
+        else if (message.messageType === 'audio') preview = '🎤 Voice message';
+        else if (message.messageType === 'file') preview = `📎 ${message.fileName || 'File'}`;
+      }
+
+      setFriendMessages((prev) => {
+        const filtered = prev.filter((m) => m.friendId !== String(friendId));
+        return [...filtered, { friendId: String(friendId), message: preview, timestamp: message.timestamp }];
+      });
+    });
+
+    return () => socket.disconnect();
+  }, []);
 
   return (
     <div className="bg-[rgba(27,32,38,255)] text-white text-sm min-h-[100vh] md:flex">

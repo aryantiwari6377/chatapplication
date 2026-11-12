@@ -101,7 +101,7 @@ socket.on('endCall', ({ to }) => {
 
 
 
-    socket.on('sendMessage', async ({ senderId, receiverId, messageText, fileUrl, fileType, fileName, messageType }) => {
+    socket.on('sendMessage', async ({ senderId, receiverId, messageText, fileUrl, fileType, fileName, messageType, replyTo }) => {
       try {
           // Build message payload — support both text and file messages
           const messagePayload = {
@@ -116,6 +116,11 @@ socket.on('endCall', ({ to }) => {
               messagePayload.fileUrl = fileUrl;
               messagePayload.fileType = fileType || null;
               messagePayload.fileName = fileName || null;
+          }
+
+          // Attach reply-to snapshot if present
+          if (replyTo) {
+              messagePayload.replyTo = replyTo;
           }
 
           const message = new Message(messagePayload);
@@ -156,14 +161,30 @@ socket.on('endCall', ({ to }) => {
      
 
 
-    socket.on('disconnect', () => {
-      onlineUsers.delete(user.id);
-      io.emit('onlineUsers', Array.from(onlineUsers));
-      console.log('User disconnected:', user.id);
-  });
+//     socket.on('disconnect', () => {
+//       onlineUsers.delete(user.id);
+//       io.emit('onlineUsers', Array.from(onlineUsers));
+//       console.log('User disconnected:', user.id);
+//   });
 
 
-  
+//pls check need to check scket id=== arrya matching socket id in multiple device case
+
+  socket.on('disconnect', () => {
+  // Remove disconnected socket ID
+  userSockets[user.id] = (userSockets[user.id] || [])
+    .filter(socketId => socketId !== socket.id);
+
+  // Mark user offline only if no connections remain
+  if (userSockets[user.id].length === 0) {
+    delete userSockets[user.id];
+    onlineUsers.delete(user.id);
+  }
+
+  io.emit('onlineUsers', Array.from(onlineUsers));
+
+  console.log('User disconnected:', user.id);
+});
 })
 
 
