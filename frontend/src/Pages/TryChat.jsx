@@ -1,5 +1,5 @@
 
-import { faArrowLeft, faCamera, faMicrophone, faPaperclip, faPhone, faPhoneSlash, faReply } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCamera, faMicrophone, faPaperclip, faPhone, faPhoneSlash, faReply, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import profile from "../images/profile.jpg";
@@ -17,6 +17,7 @@ import s1 from '../images/send4.png';
 import s2 from '../images/send1.jpeg';
 import EmojiPicker from 'emoji-picker-react';
 import { uploadFileToS3 } from '../Services/user/uploadFile';
+import Navbar from '../Components/Navbar';
 
 window.process = process;
 
@@ -32,6 +33,8 @@ const TryChat = () => {
   const [userStatus, setUserStatus] = useState({});
   const [typeStatus, setTypeStatus] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const toggleSidebar = () => setIsSidebarExpanded(!isSidebarExpanded);
   const lastMessageRef = useRef(null);
   const typingTimeout = useRef(null);
   const socketRef = useRef(null); 
@@ -53,7 +56,7 @@ const TryChat = () => {
   const historyKey = senderid && id ? `callHistory_${senderid}_${id}` : null;
   const [callHistory, setCallHistory] = useState(() => {
     try {
-      const key = `callHistory_${sessionStorage.getItem('senderId') || ''}_${window.location.pathname.split('/').pop()}`;
+      const key = `callHistory_${localStorage.getItem('senderId') || ''}_${window.location.pathname.split('/').pop()}`;
       return JSON.parse(localStorage.getItem(key) || '[]');
     } catch { return []; }
   });
@@ -161,7 +164,7 @@ const stopRingSound = () => {
 };
 
 
-  const userToken = sessionStorage.getItem('token');
+  const userToken = localStorage.getItem('token');
 
   useEffect(() => {
     
@@ -295,6 +298,7 @@ const stopRingSound = () => {
       }
       if (res) {
         setsenderid(res.senderId);
+        localStorage.setItem('senderId', res.senderId);
         setUser(res.user);
         
       }
@@ -689,20 +693,31 @@ const stopRingSound = () => {
   return (
   <>
   <div className="bg-[rgba(27,32,38,255)] min-h-screen text-white md:flex">
-  {/* Left Section */}
-  <div className="hidden md:block md:w-[50%] lg:w-[60%]">
-    <img
-       src={perfect}
-      alt="Chat Illustration"
-      className="md:pt-[16%] lg:w-[70%] lg:pt-[8%] lg:pl-[22%]"
-    />
-    <h2 className="hidden md:block text-md px-3 font-bold lg:text-xl lg:w-[60%] lg:mx-auto">
-      Chat with your besties! 💬✨
-    </h2>
-  </div>
+    {/* Leftmost Sidebar Navigation (Desktop) */}
+    <div className={`relative ${isSidebarExpanded ? "md:w-[20%]" : "md:w-[8%]"} hidden md:block flex-shrink-0 transition-all duration-200`}>
+      {/* <div
+        className='hidden md:block absolute w-[18px] h-[34px] bg-[rgb(56,59,68)] cursor-pointer flex items-center justify-center rounded-tl-[7.5px] rounded-bl-[7.5px] right-0 top-16 text-white text-lg font-semi-bold z-20'
+        onClick={toggleSidebar}
+      >
+        {isSidebarExpanded ? <FontAwesomeIcon icon={faChevronLeft} /> : <FontAwesomeIcon icon={faChevronRight} />}
+      </div> */}
+      <Navbar isSidebarExpanded={isSidebarExpanded} setisSidebarExpanded={setIsSidebarExpanded} />
+    </div>
 
-  {/* Right Section */}
-  <div className="md:w-[50%] lg:w-[40%] flex flex-col h-screen relative">
+    {/* Illustration Section (Desktop) */}
+    <div className={`hidden md:flex flex-col items-center justify-center flex-1 md:border-l-2 md:border-[rgb(85,95,94)]`}>
+      <img
+        src={perfect}
+        alt="Chat Illustration"
+        className="w-[55%] max-w-[340px] object-contain"
+      />
+      <h2 className="text-md px-3 font-bold lg:text-xl mt-4 text-center">
+        Chat with your besties! 💬✨
+      </h2>
+    </div>
+
+    {/* Right Section (Active Chat Area) */}
+    <div className={`w-full md:w-[450px] lg:w-[480px] xl:w-[500px] flex-shrink-0 flex flex-col h-screen relative md:border-l-2 md:border-[rgb(85,95,94)]`}>
     {/* Header */}
     <div className="bg-[rgba(56,59,68,255)] flex justify-between px-3 py-2">
       <div className="rounded-full w-[40px] h-[40px] bg-[rgba(41,45,54,255)]" onClick={Back}>

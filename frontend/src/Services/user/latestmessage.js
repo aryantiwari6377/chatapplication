@@ -3,9 +3,9 @@ import axios, { AxiosResponse } from "axios";
 const apiUrl = process.env.REACT_APP_API_URL;
 
 export const latestmessageservice = async (friendid) => {
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
     if (!token) {
-        throw new Error("No token found in sessionStorage");
+        throw new Error("No token found in localStorage");
     }
 
     try {//http://localhost:5000/api/latestMessage 

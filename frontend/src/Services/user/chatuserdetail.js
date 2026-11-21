@@ -3,7 +3,7 @@ const apiUrl = process.env.REACT_APP_API_URL;
 
 export const getChatUserDetails = async (userId)=> {
   try {
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
     //http://localhost:5000/api/chatuserdetail 
     const response = await axios.post(`${apiUrl}/chatuserdetail`, {
       id: userId

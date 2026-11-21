@@ -4,12 +4,13 @@ const apiUrl = process.env.REACT_APP_API_URL;
 export const logoutfun = async()=>{
  
     try{
-     const token = sessionStorage.getItem("token");
+     const token = localStorage.getItem("token");
       //http://localhost:5000/api/logout 
      const res =  await axios.post(`${apiUrl}/logout`);
      if(res.status == 200){
-     sessionStorage.removeItem("token");
-     
+     localStorage.removeItem("token");
+     localStorage.removeItem("refreshtoken");
+     localStorage.removeItem("senderId");
      }
    
      return res;

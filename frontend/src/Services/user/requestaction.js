@@ -4,7 +4,7 @@ const apiUrl = process.env.REACT_APP_API_URL;
 
 export const requestservice = async (senderId, value) => {
   try {
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
     //http://localhost:5000/api/requestaction 
     const response= await axios.post(`${apiUrl}/requestaction`, {
       senderId,

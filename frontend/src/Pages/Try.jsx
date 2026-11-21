@@ -197,7 +197,7 @@ const Try = () => {
 
   // Real-time: update the latest message preview when a new message arrives
   useEffect(() => {
-    const userToken = sessionStorage.getItem('token');
+    const userToken = localStorage.getItem('token');
     if (!userToken) return;
 
     const socket = io('http://localhost:5000', { query: { token: userToken } });
@@ -228,10 +228,10 @@ const Try = () => {
       <div className="md:flex md:w-[100%]">
 
         <div className={`relative ${isSidebarExpanded ? "md:w-[20%]" : "md:w-[8%]"}`}>
-
+{/* 
 <div className='hidden md:block absolute w-[18px] h-[34px] bg-[rgb(56,59,68)] cursor-pointer flex items-center justify-center rounded-tl-[7.5px] rounded-bl-[7.5px] right-0 top-16 text-white text-lg font-semi-bold' onClick={() => toggleSidebar()}> {isSidebarExpanded ? <FontAwesomeIcon icon={faChevronLeft} />
  : <FontAwesomeIcon icon={faChevronRight} />
-}</div>
+}</div> */}
 
           <Navbar isSidebarExpanded={isSidebarExpanded} setisSidebarExpanded={setisSidebarExpanded}/>
         </div>

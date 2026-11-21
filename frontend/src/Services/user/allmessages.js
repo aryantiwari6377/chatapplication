@@ -4,7 +4,7 @@ const apiUrl = process.env.REACT_APP_API_URL;
 
 export const allmessageservice = async(id,senderid) => {
       try{
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
             //http://localhost:5000/api/allmessages 
           const response = await axios.get(`${apiUrl}/allmessages`, {
             params: { id, senderid },

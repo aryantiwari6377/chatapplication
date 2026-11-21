@@ -9,6 +9,8 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Formik, Field, Form, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
+import { useDispatch } from 'react-redux';
+import { profileImage } from '../Redux/slices/profileSlice';
 
 const validationSchema = Yup.object({
   email: Yup.string().email('Invalid email address').required('Email is required'),
@@ -17,18 +19,23 @@ const validationSchema = Yup.object({
 
 function Login() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
   const handleform = async (values) => {
     const { email, password } = values;
   
     try {
       const res = await loginservice(email, password);
   
-    
+    console.log(res);
       if (res.status === 200) {
         toast("Login successful!");
         const { token, refreshtoken } = res.data;
-        sessionStorage.setItem('token', token);
-        sessionStorage.setItem('refreshtoken', refreshtoken);
+        localStorage.setItem('token', token);
+        localStorage.setItem('refreshtoken', refreshtoken);
+        if (res?.profileUrl) {
+        dispatch(profileImage(res.profileUrl));
+      }
         setTimeout(() => {
           navigate("/check");
         }, 3000);

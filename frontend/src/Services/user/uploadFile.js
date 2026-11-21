@@ -17,7 +17,7 @@ const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 export const uploadFileToS3 = async (file, onProgress) => {
   if (!file) throw new Error('No file provided.');
 
-  const token = sessionStorage.getItem('token');
+  const token = localStorage.getItem('token');
   if (!token) throw new Error('Not authenticated.');
 
   // Strip codec suffix so "audio/webm;codecs=opus" → "audio/webm"
