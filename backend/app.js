@@ -7,6 +7,7 @@ import connectdb from "./db.js";
 import userroute from "./routes/userroutes.js";
 import Message from "./models/messagemodel.js"
 import { verifyToken } from "./middlewares/verifytoken.js";
+//import { startEmailWorker } from "./emailWorker.js";
 
 dotenv.config();
 app.use(cors());
@@ -16,6 +17,9 @@ app.use(express.json());
 app.use('/api', userroute);
 
 await connectdb();
+
+// Start SQS email worker (polls queue and sends emails via nodemailer)
+//startEmailWorker();
 
 
 

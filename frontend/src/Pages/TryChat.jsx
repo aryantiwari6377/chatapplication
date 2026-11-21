@@ -94,7 +94,7 @@ const audioChunksRef = useRef([]);
 
 // Call events shown inline in the message list (like WhatsApp)
 const [callEvents, setCallEvents] = useState([]);
-
+   
 const formatDuration = (secs) => {
   if (!secs) return '';
   const m = Math.floor(secs / 60);
@@ -697,7 +697,7 @@ const stopRingSound = () => {
   {/* Left Section */}
   <div className="hidden md:block md:w-[50%] lg:w-[60%]">
     <img
-      src={perfect}
+       src={perfect}
       alt="Chat Illustration"
       className="md:pt-[16%] lg:w-[70%] lg:pt-[8%] lg:pl-[22%]"
     />
@@ -715,7 +715,7 @@ const stopRingSound = () => {
       </div>
 
       <div className="flex gap-x-3 px-3 rounded-full bg-[rgba(41,45,54,255)] text-white">
-        <img src={profile} alt="Profile" className="w-10 h-10 rounded-full" />
+        <img  src={profile} alt="Profile" className="w-10 h-10 rounded-full" />
         <div className="text-start">
           <p>{user?.username}</p>
           <p>{onlineUsers.has(id) ? '🟢 Online' : '⚫ Offline'}</p>
@@ -867,12 +867,20 @@ const stopRingSound = () => {
                               : isEnded     ? `Video call · ${formatDuration(entry.duration)}`
                               : '';
 
-             const callDate  = new Date(entry.time);
-             const isToday   = callDate.toDateString() === new Date().toDateString();
-             const dateStr   = isToday
-               ? callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-               : callDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
-
+              const callDate  = new Date(entry.time);
+            //  const isToday   = callDate.toDateString() === new Date().toDateString();
+            //  const dateStr   = isToday
+            //    ? callDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            //    : callDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
+            
+const dateStr = callDate.toLocaleString('en-IN', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: true
+});
              return (
                <div key={i} className="flex items-center gap-4 px-4 py-4 border-b border-[rgba(56,59,68,255)] hover:bg-[rgba(41,45,54,255)] transition">
                  {/* Avatar */}

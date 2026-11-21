@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "C:\\Users\\aryan tiwari\\OneDrive\\Desktop\\chatapplication-main\\chatapplication-main\\backend\\logs\\.85bf1e134381c3a6f9a38c8acc090803569ba10d-audit.json",
+    "files": [
+        {
+            "date": 1795250021729,
+            "name": "C:\\Users\\aryan tiwari\\OneDrive\\Desktop\\chatapplication-main\\chatapplication-main\\backend\\logs\\error-2026-11-21.log",
+            "hash": "ae3fa5f5ed2c3e3fc498b473d4e1804d9d41b0ab904b70fa8ad69e6ba0af681a"
+        }
+    ],
+    "hashType": "sha256"
+}

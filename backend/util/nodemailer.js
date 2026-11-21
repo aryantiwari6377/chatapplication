@@ -3,7 +3,6 @@ import nodemailer from "nodemailer";
 
 dotenv.config();
 
-// Lazy singleton — created on first call so env vars are always populated
 let _transporter = null;
 
 export const getTransporter = () => {
@@ -15,12 +14,16 @@ export const getTransporter = () => {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_PASS,
     },
+    tls: {
+      // Required on networks where a proxy/antivirus intercepts TLS
+      // (e.g. corporate networks, some ISPs on Windows)
+      rejectUnauthorized: false,
+    },
   });
 
   return _transporter;
 };
 
-// Keep old export name so nothing else breaks
 export const testaccount = {
   sendMail: (opts) => getTransporter().sendMail(opts),
 };

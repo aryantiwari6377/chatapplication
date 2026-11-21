@@ -24,16 +24,37 @@ function Notificationpage() {
     dispatch(notification(res.data.requestFriends));
   };
 
-  const requestdecision = async (senderId, value) => {
-    const res = await requestservice(senderId, value);
-   if(res.status === 401){
-     navigate("/login");
-   }
-    if(res.status==200){ 
-      setFriends((prevFriends) => prevFriends.filter(friend => friend._id !== senderId));
-    }
+  // const requestdecision = async (senderId, value) => {
+  //   const res = await requestservice(senderId, value);
+  //  if(res.status === 401){
+  //    navigate("/login");
+  //  }
+  //   if(res.status==200){ 
+  //     setFriends((prevFriends) => prevFriends.filter(friend => friend._id !== senderId));
+  //   }
   
-  };
+  // };
+
+  const requestdecision = async (senderId, value) => {
+  try {
+    const res = await requestservice(senderId, value);
+
+    if (res.status === 401) {
+      navigate("/login");
+      return;
+    }
+
+    if (res.status === 200) {
+      const updatedRequests = friendrequest.filter(
+        friend => friend._id !== senderId
+      );
+
+      dispatch(notification(updatedRequests));
+    }
+  } catch (error) {
+    console.error("Request action failed:", error);
+  }
+};
 
   useEffect(() => {
     handlerequests();

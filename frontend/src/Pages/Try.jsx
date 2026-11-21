@@ -51,13 +51,25 @@ const Try = () => {
     setisSidebarExpanded(!isSidebarExpanded);
   }
 
+  // const formatTimestamp = (timestamp) => {
+  //   if (!timestamp) return '';
+  //   const date = new Date(timestamp);
+  //   const hours = date.getHours();
+  //   const minutes = date.getMinutes();
+  //   return `${hours}:${minutes < 10 ? '0' + minutes : minutes}`;
+  // };
+
   const formatTimestamp = (timestamp) => {
-    if (!timestamp) return '';
-    const date = new Date(timestamp);
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    return `${hours}:${minutes < 10 ? '0' + minutes : minutes}`;
-  };
+  if (!timestamp) return "";
+
+  const date = new Date(timestamp);
+
+  return date.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true
+  });
+};
    
   // const friendlist = async () => {
   //   try {

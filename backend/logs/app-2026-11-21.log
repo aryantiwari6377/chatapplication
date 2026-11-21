@@ -1,0 +1,2 @@
+{"level":"info","message":"MongoDB connected","service":"chat-app","timestamp":"2026-11-21T14:03:46.062+05:30"}
+{"level":"info","message":"[Worker] Email worker starting","queueUrl":"https://sqs.ap-south-1.amazonaws.com/533267212966/email-queue","region":"ap-south-1","service":"chat-app","timestamp":"2026-11-21T14:03:46.080+05:30"}
