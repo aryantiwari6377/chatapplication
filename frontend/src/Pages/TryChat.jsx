@@ -1,10 +1,12 @@
 
-import { faArrowLeft, faCamera, faMicrophone, faPaperclip, faPhone, faPhoneSlash, faReply, faShare } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faCamera, faMicrophone, faPaperclip, faPhone, faPhoneSlash, faReply } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import profile from "../images/profile.jpg";
 import { faFaceSmile } from '@fortawesome/free-regular-svg-icons';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { setLatestMessage } from '../Redux/slices/loadingSlice';
 import { getChatUserDetails } from '../../src/Services/user/chatuserdetail';
 import { io } from 'socket.io-client';
 import { allmessageservice } from '../Services/user/allmessages';
@@ -15,7 +17,6 @@ import s1 from '../images/send4.png';
 import s2 from '../images/send1.jpeg';
 import EmojiPicker from 'emoji-picker-react';
 import { uploadFileToS3 } from '../Services/user/uploadFile';
-import { friendlistservice } from '../Services/user/friendlist';
 
 window.process = process;
 
@@ -23,6 +24,7 @@ window.process = process;
 const TryChat = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [user, setUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -110,12 +112,6 @@ const pushCallEvent = (entry) => {
 const [replyTo, setReplyTo] = useState(null); // { _id, content, messageType, fileName, fileUrl, senderName }
 const inputRef = useRef(null); // focus input after selecting reply
 
-// ── Forward state ─────────────────────────────────────────────────────────────
-const [forwardMsg, setForwardMsg]     = useState(null);  // message being forwarded
-const [friendsList, setFriendsList]   = useState([]);    // loaded on demand
-const [showForward, setShowForward]   = useState(false);
-const [forwardSearch, setForwardSearch] = useState('');
-
 // ── Call sound ───────────────────────────────────────────────────────────────
 const audioCtxRef      = useRef(null);
 const ringIntervalRef  = useRef(null);
@@ -186,17 +182,27 @@ const stopRingSound = () => {
 
       // });
       socketRef.current.on('receiveMessage', (message) => {
-  const messageSenderId = message.senderId ?? message.sender;
-  // Use the ref so we always have the latest senderid even though
-  // this closure was created before senderid was populated.
-  const isOwnMessage = String(messageSenderId) === String(senderIdRef.current);
+        const messageSenderId = message.senderId ?? message.sender;
+        const isOwnMessage = String(messageSenderId) === String(senderIdRef.current);
 
-  // Text messages: sender added them optimistically — skip the socket echo.
-  // File/image/audio messages: no optimistic add was done — show socket response for everyone.
-  if (isOwnMessage && (message.messageType === 'text' || !message.messageType)) return;
+        let preview = message.content || message.messageText || '';
+        if (!preview) {
+          if (message.messageType === 'image') preview = '📷 Photo';
+          else if (message.messageType === 'audio') preview = '🎤 Voice message';
+          else if (message.messageType === 'file') preview = `📎 ${message.fileName || 'File'}`;
+        }
+        dispatch(setLatestMessage({
+          friendId: id,
+          message: preview,
+          timestamp: message.timestamp || new Date().toISOString(),
+        }));
 
-  setMessages((prevMessages) => [...prevMessages, message]);
-});
+        // Text messages: sender added them optimistically — skip the socket echo.
+        // File/image/audio messages: no optimistic add was done — show socket response for everyone.
+        if (isOwnMessage && (message.messageType === 'text' || !message.messageType)) return;
+
+        setMessages((prevMessages) => [...prevMessages, message]);
+      });
 
       socketRef.current.on('onlineUsers', (users) => {
         setOnlineUsers(new Set(users));
@@ -324,6 +330,16 @@ const stopRingSound = () => {
                       : fileType.startsWith('audio/') ? 'audio'
                       : 'file';
 
+        const previewText = msgType === 'image' ? '📷 Photo'
+                          : msgType === 'audio' ? '🎤 Voice message'
+                          : `📎 ${fileName || 'File'}`;
+
+        dispatch(setLatestMessage({
+          friendId: id,
+          message: previewText,
+          timestamp: new Date().toISOString(),
+        }));
+
         socketRef.current.emit('sendMessage', {
           senderId: senderid,
           receiverId: id,
@@ -353,6 +369,13 @@ const stopRingSound = () => {
       timestamp: new Date().toISOString(),
       ...(replyTo ? { replyTo } : {}),
     };
+
+    dispatch(setLatestMessage({
+      friendId: id,
+      message: newMessage,
+      timestamp: messageData.timestamp,
+    }));
+
     setMessages((prevMessages) => [...prevMessages, messageData]);
     socketRef.current.emit('sendMessage', messageData);
     setNewMessage('');
@@ -559,35 +582,7 @@ const stopRingSound = () => {
 
 
 
-  // ── Forward message ───────────────────────────────────────────────────────
-  const openForward = async (msg) => {
-    setForwardMsg(msg);
-    setForwardSearch('');
-    if (friendsList.length === 0) {
-      try {
-        const res = await friendlistservice();
-        setFriendsList(res.data?.activeFriends || []);
-      } catch {}
-    }
-    setShowForward(true);
-  };
 
-  const sendForward = (targetFriendId) => {
-    if (!forwardMsg || !socketRef.current) return;
-    // Forward as a copy: same content/file but no replyTo, marked forwarded
-    socketRef.current.emit('sendMessage', {
-      senderId: senderid,
-      receiverId: targetFriendId,
-      messageText: forwardMsg.content || forwardMsg.messageText || '',
-      fileUrl: forwardMsg.fileUrl || null,
-      fileType: forwardMsg.fileType || null,
-      fileName: forwardMsg.fileName || null,
-      messageType: forwardMsg.messageType || 'text',
-      timestamp: new Date().toISOString(),
-    });
-    setShowForward(false);
-    setForwardMsg(null);
-  };
 
 // ── Camera handlers ───────────────────────────────────────────────────────────
   const openCamera = async () => {
@@ -715,7 +710,7 @@ const stopRingSound = () => {
       </div>
 
       <div className="flex gap-x-3 px-3 rounded-full bg-[rgba(41,45,54,255)] text-white">
-        <img  src={profile} alt="Profile" className="w-10 h-10 rounded-full" />
+        <img src={user?.profileImage || profile} alt="Profile" className="w-10 h-10 rounded-full object-cover" />
         <div className="text-start">
           <p>{user?.username}</p>
           <p>{onlineUsers.has(id) ? '🟢 Online' : '⚫ Offline'}</p>
@@ -753,7 +748,7 @@ const stopRingSound = () => {
    {callStatus === 'ringing' && (
      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
        <div className="bg-[rgba(41,45,54,255)] rounded-2xl p-8 flex flex-col items-center gap-5 shadow-2xl w-[300px]">
-         <img src={profile} alt="" className="w-20 h-20 rounded-full border-4 border-[rgba(192,52,48,255)]" />
+         <img src={user?.profileImage || profile} alt="" className="w-20 h-20 rounded-full border-4 border-[rgba(192,52,48,255)] object-cover" />
          <p className="text-white font-semibold text-lg">{user?.username}</p>
          <p className="text-gray-400 text-sm animate-pulse">Ringing…</p>
          {/* Animated ring rings */}
@@ -779,7 +774,7 @@ const stopRingSound = () => {
    {call?.isReceivingCall && !callAccepted && callStatus !== 'ringing' && (
      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
        <div className="bg-[rgba(41,45,54,255)] rounded-2xl p-8 flex flex-col items-center gap-5 shadow-2xl w-[300px]">
-         <img src={profile} alt="" className="w-20 h-20 rounded-full border-4 border-green-500" />
+         <img src={user?.profileImage || profile} alt="" className="w-20 h-20 rounded-full border-4 border-green-500 object-cover" />
          <p className="text-white font-semibold text-lg">{user?.username}</p>
          <p className="text-gray-400 text-sm animate-pulse">Incoming video call…</p>
          <div className="flex gap-8 mt-2">
@@ -990,19 +985,11 @@ const dateStr = callDate.toLocaleString('en-IN', {
                       });
                       inputRef.current?.focus();
                     }}
-                    className="text-gray-400 hover:text-white text-xs flex items-center gap-1 bg-[rgba(41,45,54,255)] px-2 py-1 rounded-full"
+                    className="text-gray-400 hover:text-white text-xs flex items-center gap-1 bg-[rgba(41,45,54,255)] px-2 py-1 rounded-full cursor-pointer hover:bg-[rgba(56,59,68,255)] transition"
                     title="Reply"
                   >
                     <FontAwesomeIcon icon={faReply} className="text-[10px]" />
                     <span>Reply</span>
-                  </button>
-                  <button
-                    onClick={() => openForward(item)}
-                    className="text-gray-400 hover:text-white text-xs flex items-center gap-1 bg-[rgba(41,45,54,255)] px-2 py-1 rounded-full"
-                    title="Forward"
-                  >
-                    <FontAwesomeIcon icon={faShare} className="text-[10px]" />
-                    <span>Forward</span>
                   </button>
                 </div>
 
@@ -1079,6 +1066,35 @@ const dateStr = callDate.toLocaleString('en-IN', {
     {/* Input Section */}
     <div className="bg-[rgba(41,45,54,255)] w-full py-2 px-2 md:px-4 flex flex-col gap-1">
 
+      {/* Staged reply preview — shown after selecting reply on a message, before hitting send */}
+      {replyTo && (
+        <div className="flex items-center justify-between bg-[rgba(56,59,68,255)] border-l-4 border-[rgba(192,52,48,255)] rounded-lg px-3 py-2 mb-1 text-xs">
+          <div className="flex flex-col min-w-0 pr-2">
+            <span className="text-[rgba(192,52,48,255)] font-semibold text-[11px] flex items-center gap-1">
+              <FontAwesomeIcon icon={faReply} className="text-[9px]" />
+              Replying to {replyTo.senderName}
+            </span>
+            <span className="text-gray-300 truncate">
+              {replyTo.messageType === 'image'
+                ? '📷 Photo'
+                : replyTo.messageType === 'audio'
+                ? '🎤 Voice message'
+                : replyTo.messageType === 'file'
+                ? `📎 ${replyTo.fileName || 'File'}`
+                : replyTo.content || 'Message'}
+            </span>
+          </div>
+          <button
+            onClick={() => setReplyTo(null)}
+            className="text-gray-400 hover:text-white text-sm p-1 leading-none rounded-full hover:bg-[rgba(41,45,54,255)] cursor-pointer"
+            title="Cancel reply"
+            type="button"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Staged file preview — shown after picking a file, before hitting send */}
       {stagedFile && (
         <div className="flex items-center gap-2 bg-[rgba(56,59,68,255)] rounded-lg px-3 py-2 mb-1">
@@ -1099,7 +1115,7 @@ const dateStr = callDate.toLocaleString('en-IN', {
               if (stagedFile.previewUrl) URL.revokeObjectURL(stagedFile.previewUrl);
               setStagedFile(null);
             }}
-            className="text-gray-400 hover:text-white text-sm leading-none"
+            className="text-gray-400 hover:text-white text-sm leading-none cursor-pointer"
             aria-label="Remove attachment"
           >
             ✕
@@ -1141,6 +1157,7 @@ const dateStr = callDate.toLocaleString('en-IN', {
   )}
 </div>
       <input
+        ref={inputRef}
         type="text"
         placeholder="Type a message"
         value={newMessage}

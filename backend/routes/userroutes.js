@@ -60,7 +60,7 @@ router.post('/chatuserdetail',authenticationcheck,chatuserdetail);
 
 router.get('/allmessages',allmessages);
 router.get('/latestMessage',authenticationcheck,latestMessage);
-router.post('/forgot',forgot);
+router.post('/forgot',authenticationcheck,forgot);
 
 router.post('/reset-password/:token',authenticationcheck,changepassword);
 

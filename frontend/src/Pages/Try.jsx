@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import vector75left from '../images/Vector75left.svg';
 import vector75right from '../images/Vector 75right.svg';
-import { loadingHandle ,friendList} from '../Redux/slices/loadingSlice';
+import { loadingHandle, friendList, setLatestMessage } from '../Redux/slices/loadingSlice';
 import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 import { io } from 'socket.io-client';
@@ -23,7 +23,6 @@ const Try = () => {
   const [friendslist, setFriendslist] = useState([]);
   const fri = useRef([]);
   const [filteredFriends, setFilteredFriends] = useState([]);
-  const [friendMessages, setFriendMessages] = useState([]);
   const [searchName, setSearchName] = useState('');
   const [searchfound, setsearchfound] = useState(false);
  // const [loading, setLoading] = useState(true);
@@ -38,6 +37,7 @@ const Try = () => {
   const userimage = useSelector(state => state.profile.profileUrl);
    
   const friendsList =  useSelector(state => state.loader.friends);
+  const latestMessages = useSelector(state => state.loader.latestMessages || {});
   console.log("list",friendsList);
 
   const loading = useSelector(state => state.loader.loading);
@@ -144,15 +144,17 @@ const Try = () => {
       const data = res.data;
 
       if (data.empty) {
-        setFriendMessages((prev) => {
-          const filtered = prev.filter((m) => m.friendId !== friendid);
-          return [...filtered, { friendId: friendid, message: 'Say hi 👋', timestamp: null }];
-        });
+        dispatch(setLatestMessage({
+          friendId: friendid,
+          message: 'Say hi 👋',
+          timestamp: null,
+        }));
       } else {
-        setFriendMessages((prev) => {
-          const filtered = prev.filter((m) => m.friendId !== friendid);
-          return [...filtered, { friendId: friendid, message: data.content, timestamp: data.timestamp }];
-        });
+        dispatch(setLatestMessage({
+          friendId: friendid,
+          message: data.content,
+          timestamp: data.timestamp,
+        }));
       }
     } catch (error) {
       console.error('Error fetching latest message:', error);
@@ -211,10 +213,11 @@ const Try = () => {
         else if (message.messageType === 'file') preview = `📎 ${message.fileName || 'File'}`;
       }
 
-      setFriendMessages((prev) => {
-        const filtered = prev.filter((m) => m.friendId !== String(friendId));
-        return [...filtered, { friendId: String(friendId), message: preview, timestamp: message.timestamp }];
-      });
+      dispatch(setLatestMessage({
+        friendId: String(friendId),
+        message: preview,
+        timestamp: message.timestamp,
+      }));
     });
 
     return () => socket.disconnect();
@@ -286,61 +289,14 @@ const Try = () => {
            onClick={addfriendclose} >Add</button></div> ) : searchfound ? (
               // Filtered friends
               filteredFriends.map((friend) => {
-                const friendMessage = friendMessages.find(
-                  (msg) => msg.friendId === friend._id
-                );
-                
-                 
-                const formattedTime =
-                  friendMessage?.timestamp && friendMessage.timestamp !== 'no'
-                    ? formatTimestamp(friendMessage.timestamp)
-                    : '00:00';
+                const msgData = latestMessages[friend._id];
+                const preview = msgData ? msgData.message : 'Say hi 👋';
+                const formattedTime = msgData?.timestamp ? formatTimestamp(msgData.timestamp) : '';
         
                 return (
                   <div
                     key={friend._id}
-                    className="flex justify-between"
-                    onClick={() => {
-                      navigate(`/chatchat/${friend._id}`);
-                    }}
-                  >
-                    <div className="flex gap-x-12">
-                      <div>
-                        <img
-                          src={profile}
-                          className="rounded-full h-[50px] w-[50px]"
-                          alt={`${friend.username}'s profile`}
-                        />
-                      </div>
-                      <div className="text-start">
-                        <p className="text-[16px]">{friend.username}</p>
-                        <p>
-                          {friendMessage ? friendMessage.message : 'No messages'}
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <p>{formattedTime}</p>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (  
-              // All friends list
-              friendsList.map((friend) => {
-                const friendMessage = friendMessages.find(
-                  (msg) => msg.friendId === friend._id
-                );
-
-                const formattedTime =
-                  friendMessage?.timestamp && friendMessage.timestamp !== 'no'
-                    ? formatTimestamp(friendMessage.timestamp)
-                    : '00:00';
- 
-                return (
-                  <div
-                    key={friend._id}
-                    className="flex justify-between  cursor-pointer"
+                    className="flex justify-between cursor-pointer"
                     onClick={() => {
                       navigate(`/chatchat/${friend._id}`);
                     }}
@@ -349,19 +305,55 @@ const Try = () => {
                       <div>
                         <img
                           src={friend.profileImage || profile}
-                          className="rounded-full h-[50px] w-[50px]"
+                          className="rounded-full h-[50px] w-[50px] object-cover"
                           alt={`${friend.username}'s profile`}
                         />
                       </div>
                       <div className="text-start">
                         <p className="text-[16px]">{friend.username}</p>
-                        <p>
-                          {friendMessage ? friendMessage.message : 'No messages'}
+                        <p className="text-gray-400 text-xs">
+                          {preview}
                         </p>
                       </div>
                     </div>
                     <div>
-                      <p>{formattedTime}</p>
+                      <p className="text-gray-400 text-xs">{formattedTime}</p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (  
+              // All friends list
+              friendsList.map((friend) => {
+                const msgData = latestMessages[friend._id];
+                const preview = msgData ? msgData.message : 'Say hi 👋';
+                const formattedTime = msgData?.timestamp ? formatTimestamp(msgData.timestamp) : '';
+ 
+                return (
+                  <div
+                    key={friend._id}
+                    className="flex justify-between cursor-pointer"
+                    onClick={() => {
+                      navigate(`/chatchat/${friend._id}`);
+                    }}
+                  >
+                    <div className="flex gap-x-12">
+                      <div>
+                        <img
+                          src={friend.profileImage || profile}
+                          className="rounded-full h-[50px] w-[50px] object-cover"
+                          alt={`${friend.username}'s profile`}
+                        />
+                      </div>
+                      <div className="text-start">
+                        <p className="text-[16px]">{friend.username}</p>
+                        <p className="text-gray-400 text-xs">
+                          {preview}
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 text-xs">{formattedTime}</p>
                     </div>
                   </div>
                 );

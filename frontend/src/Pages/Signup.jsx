@@ -121,10 +121,10 @@ function Signup() {
  
     if (error.response) {
       const { status, data } = error.response;
-      if (status === 400) {
-        toast.error("User already exists.");
+      if (status === 400 || (data && data.message && data.message.toLowerCase().includes("exist"))) {
+        toast.error(data?.message || "User already has an account.");
       } else {
-        toast.error(data.message || "Something went wrong!");
+        toast.error(data?.message || "Something went wrong!");
       }
     } else {
       toast.error("Network error, please try again.");

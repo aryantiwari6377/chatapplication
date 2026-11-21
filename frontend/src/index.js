@@ -6,7 +6,11 @@ import App from './App';
 // import reportWebVitals from './reportWebVitals';
 import { Provider } from 'react-redux';
 import Store from "./Redux/Store";
+import { setStore } from './Services/auth/login';
 
+// Give the login service access to the Redux store so it can
+// dispatch profileImage right after a successful login
+setStore(Store);
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

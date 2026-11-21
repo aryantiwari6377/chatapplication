@@ -26,7 +26,12 @@ export const login = async(req,res) =>{
           const refreshtoken = jwt.sign({id: user._id, email: user.email},process.env.REFRESH_KEY,{expiresIn:'15d'})
             
            console.log(token, refreshtoken);
-           return  res.status(200).json({message:"login successfully", token, refreshtoken});
+           return  res.status(200).json({
+             message:"login successfully",
+             token,
+             refreshtoken,
+             user: { profileImage: user.profileImage || null }
+           });
       }
       catch(error){
         return  res.status(500).json({error: error.message});
