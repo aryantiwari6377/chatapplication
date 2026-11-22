@@ -207,23 +207,34 @@ dotenv.config();
 
 const app = express();
 
-// Allow your Vercel frontend URL + local dev URLs
 const allowedOrigins = [
-  process.env.FRONTEND_URL, // e.g., https://your-chat-app.vercel.app
-  "http://localhost:3000",
-].filter(Boolean);
+  process.env.FRONTEND_URL,
+  "https://konekto-web-eta.vercel.app",
+]
+  .filter(Boolean)
+  .map((url) => url.trim().replace(/\/+$/, "")); // removes accidental spaces or trailing '/'
 
-app.use(
-  cors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests without an Origin header (like health checks, curl, or server-to-server)
+    if (!origin) return callback(null, true);
 
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Lightweight health check route for Render / cron-job.org / UptimeRobot
 app.get("/health", (req, res) => {
+  console.log(`[HEALTH] Ping received at ${new Date().toISOString()} from ${req.ip}`);
   res.status(200).json({ status: "ok" });
 });
 
@@ -240,9 +251,21 @@ const server = app.listen(PORT, () => {
   console.log(`server is running on port ${PORT}`);
 });
 
+// const io = new Server(server, {
+//   cors: {
+//     origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
+//     methods: ["GET", "POST"],
+//     credentials: true,
+//   },
+// });
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Socket CORS blocked: ${origin}`));
+    },
     methods: ["GET", "POST"],
     credentials: true,
   },
