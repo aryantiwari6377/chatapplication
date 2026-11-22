@@ -1,24 +1,11 @@
-import axios from 'axios';
-const apiUrl = process.env.REACT_APP_API_URL;
+import axiosInstance from '../axiosInstance';
 
-export const getChatUserDetails = async (userId)=> {
+export const getChatUserDetails = async (userId) => {
   try {
-    const token = localStorage.getItem('token');
-    //http://localhost:5000/api/chatuserdetail 
-    const response = await axios.post(`${apiUrl}/chatuserdetail`, {
-      id: userId
-    },{
-      headers: {
-        Authorization: `${token}`, 
-      },
-    });
-      
-    console.log("service response",response);
+    const response = await axiosInstance.post('/chatuserdetail', { id: userId });
     const senderId = response.data.author;
     const user = response.data.user;
-    return {user,senderId};
-  
-    
+    return { user, senderId };
   } catch (error) {
     console.error('Error fetching user details:', error);
     return null;

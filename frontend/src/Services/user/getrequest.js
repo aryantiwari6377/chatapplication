@@ -1,23 +1,11 @@
-
-import axios, { AxiosResponse } from "axios";
-const apiUrl = process.env.REACT_APP_API_URL;
+import axiosInstance from '../axiosInstance';
 
 export const getrequestservice = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        throw new Error("No token found in localStorage");
-    }
-
-    try {//http://localhost:5000/api/getrequests 
-        const response = await axios.get(`${apiUrl}/getrequests`, {
-            headers: {
-                Authorization: `${token}`, 
-            },
-        });
-        // console.log("Notification requests", response); 
-        return response;
-    } catch (error) {
-        console.error("Error fetching request service:", error);
-        throw error; 
-    }
+  try {
+    const response = await axiosInstance.get('/getrequest');
+    return response;
+  } catch (error) {
+    console.error('Error fetching request service:', error);
+    throw error;
+  }
 };

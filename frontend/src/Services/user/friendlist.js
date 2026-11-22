@@ -1,20 +1,10 @@
-import axios, { AxiosResponse }  from "axios";
-const apiUrl = process.env.REACT_APP_API_URL;
+import axiosInstance from '../axiosInstance';
 
-export const friendlistservice = async()=>{
-try{
-    const token = localStorage.getItem('token');
-    console.log("token is ",token);
-    //http://localhost:5000/api/friendslist 
-    const response = await axios.get(`${apiUrl}/friendslist`,{
-        headers: {
-            Authorization: `${token}`, 
-          },
-    });
-    console.log("service res",response);
+export const friendlistservice = async () => {
+  try {
+    const response = await axiosInstance.get('/friendslist');
     return response;
-}
-catch(error){
-     throw new Error("error"+error);
-}
-}
+  } catch (error) {
+    throw new Error('error' + error);
+  }
+};

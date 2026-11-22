@@ -199,8 +199,8 @@ const Try = () => {
   useEffect(() => {
     const userToken = localStorage.getItem('token');
     if (!userToken) return;
-
-    const socket = io('http://localhost:5000', { query: { token: userToken } });
+ const SOCKET_URL = process.env.REACT_APP_API_URL;
+    const socket = io( SOCKET_URL, { query: { token: userToken } });
 
     socket.on('receiveMessage', (message) => {
       const friendId = message.sender ?? message.senderId;

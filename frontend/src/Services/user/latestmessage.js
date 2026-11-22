@@ -1,28 +1,13 @@
-
-import axios, { AxiosResponse } from "axios";
-const apiUrl = process.env.REACT_APP_API_URL;
+import axiosInstance from '../axiosInstance';
 
 export const latestmessageservice = async (friendid) => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        throw new Error("No token found in localStorage");
-    }
-
-    try {//http://localhost:5000/api/latestMessage 
-        const response = await axios.get(`${apiUrl}/latestMessage`, {
-            params:{
-                receiverId:friendid
-            },
-            headers: {
-                Authorization: `${token}`, 
-            },
-        });
-        //  console.log("message,time", response); 
-        return response;
-    } catch (error) {
-        console.error("Error fetching request service:", error);
-        throw error; 
-    }
+  try {
+    const response = await axiosInstance.get('/latestMessage', {
+      params: { receiverId: friendid },
+    });
+    return response;
+  } catch (error) {
+    console.error('Error fetching latest message:', error);
+    throw error;
+  }
 };
-
-

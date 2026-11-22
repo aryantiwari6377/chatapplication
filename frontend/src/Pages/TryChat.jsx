@@ -167,9 +167,9 @@ const stopRingSound = () => {
   const userToken = localStorage.getItem('token');
 
   useEffect(() => {
-    
+   const SOCKET_URL = process.env.REACT_APP_API_URL;
     if (!socketRef.current) {
-      socketRef.current = io('http://localhost:5000', {
+      socketRef.current = io(SOCKET_URL, {
         query: { token: userToken },
       });
 

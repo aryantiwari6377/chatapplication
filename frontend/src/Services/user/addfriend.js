@@ -1,22 +1,10 @@
-import axios, { AxiosResponse } from "axios";
-const apiUrl = process.env.REACT_APP_API_URL;
+import axiosInstance from '../axiosInstance';
 
-
-
-export const addfriendservice = async(email) => {
+export const addfriendservice = async (email) => {
   try {
-    const token = localStorage.getItem('token');
-    const response = await axios.post(`${apiUrl}/addfriend`, { email }, {
-      headers: {
-        Authorization: `${token}`, 
-      },
-    });
-    console.log(response);
+    const response = await axiosInstance.post('/addfriend', { email });
     return response;
-  } catch(error) {
+  } catch (error) {
     throw error;
   }
 };
-
-
-
