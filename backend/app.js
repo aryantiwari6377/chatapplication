@@ -1,196 +1,409 @@
-import express from "express";
+// import express from "express";
+// import { Server } from "socket.io";
+// const app = express();
+// import dotenv from "dotenv";
+// import cors from "cors";
+// import connectdb from "./db.js";
+// import userroute from "./routes/userroutes.js";
+// import Message from "./models/messagemodel.js"
+// import { verifyToken } from "./middlewares/verifytoken.js";
+// //import { startEmailWorker } from "./emailWorker.js";
+
+// dotenv.config();
+// app.use(cors());
+
+// app.use(express.json());
+
+// app.use('/api', userroute);
+
+// await connectdb();
+
+// // Start SQS email worker (polls queue and sends emails via nodemailer)
+// //startEmailWorker();
+
+
+
+// const server = app.listen(5000,()=>{ console.log("server is runing")});
+
+// const io = new Server(server,{
+//     cors: {
+//       origin: '*', 
+//       methods: ['GET', 'POST'],
+//     },
+//   });
+//   const onlineUsers = new Set();
+//   // const onlineUsers = new Map(); 
+  
+//    const userSockets = {};
+  
+  
+//   io.on('connection',(socket)=>{
+//     console.log(`User connected: ${socket.id}`);
+  
+//     const token = socket.handshake.query.token;
+//     // console.log("token is",token);
+//     const user = verifyToken(token);
+
+//     // const onlineUsers = new Map();
+     
+    
+
+
+//     if (!user) {
+//         console.log('Invalid token. Disconnecting socket:', socket.id);
+//         socket.disconnect();
+//         return;
+//     }
+
+//     const userId = user.id;
+    
+//      console.log(`${userId} connected and is online`);
+  
+//      if (!userSockets[userId]) {
+//       userSockets[userId] = [];
+//   }
+//   userSockets[userId].push(socket.id);
+  
+//     onlineUsers.add(user.id);
+//     io.emit('onlineUsers', Array.from(onlineUsers));
+    
+//     console.log('User connected:', user.id);
+//     console.log('Current online users:', onlineUsers);
+  
+//    //new
+//    socket.on('callUser', ({ receiverId, signalData, from }) => {
+//     const receiverSockets = userSockets[receiverId] || [];
+//     receiverSockets.forEach(socketId => {
+//         io.to(socketId).emit('incomingCall', { from, signalData });
+//     });
+// });
+
+// // Handle Call Answering  
+// socket.on('answerCall', ({ to, signal }) => {
+//     const senderSockets = userSockets[to] || [];
+//     senderSockets.forEach(socketId => {
+//         io.to(socketId).emit('callAccepted', signal);
+//     });
+// });
+
+// // Handle Call Rejection
+// socket.on('rejectCall', ({ to }) => {
+//     const senderSockets = userSockets[to] || [];
+//     senderSockets.forEach(socketId => {
+//         io.to(socketId).emit('callRejected');
+//     });
+// });
+
+// // Handle Call End
+// socket.on('endCall', ({ to }) => {
+//     const senderSockets = userSockets[to] || [];
+//     senderSockets.forEach(socketId => {
+//         io.to(socketId).emit('callEnded');
+//     });
+// });
+
+
+
+
+//     socket.on('sendMessage', async ({ senderId, receiverId, messageText, fileUrl, fileType, fileName, messageType, replyTo }) => {
+//       try {
+//           // Build message payload — support both text and file messages
+//           const messagePayload = {
+//               sender: senderId,
+//               receiver: receiverId,
+//               content: messageText || '',
+//               messageType: messageType || 'text',
+//           };
+
+//           // Attach file metadata if present
+//           if (fileUrl) {
+//               messagePayload.fileUrl = fileUrl;
+//               messagePayload.fileType = fileType || null;
+//               messagePayload.fileName = fileName || null;
+//           }
+
+//           // Attach reply-to snapshot if present
+//           if (replyTo) {
+//               messagePayload.replyTo = replyTo;
+//           }
+
+//           const message = new Message(messagePayload);
+//           await message.save();
+
+//           console.log("New message saved:", message);
+
+//           const senderSockets = userSockets[senderId] || [];
+//           senderSockets.forEach(socketId => {
+//               io.to(socketId).emit('receiveMessage', message);
+//           });
+
+//           const receiverSockets = userSockets[receiverId] || [];
+//           receiverSockets.forEach(socketId => {
+//               io.to(socketId).emit('receiveMessage', message);
+//           });
+
+//           console.log(`Message emitted to sender ${senderId} and receiver ${receiverId}`);
+//       } catch (error) {
+//           console.error("Error handling sendMessage:", error);
+//       }
+//   });
+  
+
+   
+   
+//   socket.on('userOffline', (userId) => {
+//     console.log('User offline:', userId);
+//     onlineUsers.delete(userId);
+//     io.emit('onlineUsers', Array.from(onlineUsers));
+// });
+      
+  
+     
+//     socket.on('typing', ({ senderId, receiverId, isTyping }) => {
+//       socket.to(receiverId).emit('displayTyping', { senderId, isTyping });
+//     });
+     
+
+
+// //     socket.on('disconnect', () => {
+// //       onlineUsers.delete(user.id);
+// //       io.emit('onlineUsers', Array.from(onlineUsers));
+// //       console.log('User disconnected:', user.id);
+// //   });
+
+
+// //pls check need to check scket id=== arrya matching socket id in multiple device case
+
+//   socket.on('disconnect', () => {
+//   // Remove disconnected socket ID
+//   userSockets[user.id] = (userSockets[user.id] || [])
+//     .filter(socketId => socketId !== socket.id);
+
+//   // Mark user offline only if no connections remain
+//   if (userSockets[user.id].length === 0) {
+//     delete userSockets[user.id];
+//     onlineUsers.delete(user.id);
+//   }
+
+//   io.emit('onlineUsers', Array.from(onlineUsers));
+
+//   console.log('User disconnected:', user.id);
+// });
+// })
+
+
+
+  import express from "express";
 import { Server } from "socket.io";
-const app = express();
 import dotenv from "dotenv";
 import cors from "cors";
 import connectdb from "./db.js";
 import userroute from "./routes/userroutes.js";
-import Message from "./models/messagemodel.js"
+import Message from "./models/messagemodel.js";
 import { verifyToken } from "./middlewares/verifytoken.js";
 //import { startEmailWorker } from "./emailWorker.js";
 
 dotenv.config();
-app.use(cors());
+
+const app = express();
+
+// Allow your Vercel frontend URL + local dev URLs
+const allowedOrigins = [
+  process.env.FRONTEND_URL, // e.g., https://your-chat-app.vercel.app
+  "http://localhost:3000",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 
-app.use('/api', userroute);
+// Lightweight health check route for Render / cron-job.org / UptimeRobot
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+app.use("/api", userroute);
 
 await connectdb();
 
 // Start SQS email worker (polls queue and sends emails via nodemailer)
 //startEmailWorker();
 
+// Use Render's dynamic PORT in production, fallback to 5000 locally
+const PORT = process.env.PORT || 5000;
+const server = app.listen(PORT, () => {
+  console.log(`server is running on port ${PORT}`);
+});
 
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
 
-const server = app.listen(5000,()=>{ console.log("server is runing")});
+const onlineUsers = new Set();
+// const onlineUsers = new Map();
 
-const io = new Server(server,{
-    cors: {
-      origin: '*', 
-      methods: ['GET', 'POST'],
-    },
-  });
-  const onlineUsers = new Set();
-  // const onlineUsers = new Map(); 
-  
-   const userSockets = {};
-  
-  
-  io.on('connection',(socket)=>{
-    console.log(`User connected: ${socket.id}`);
-  
-    const token = socket.handshake.query.token;
-    // console.log("token is",token);
-    const user = verifyToken(token);
+const userSockets = {};
 
-    // const onlineUsers = new Map();
-     
-    
+io.on("connection", (socket) => {
+  console.log(`User connected: ${socket.id}`);
 
+  const token = socket.handshake.query.token;
+  // console.log("token is",token);
+  const user = verifyToken(token);
 
-    if (!user) {
-        console.log('Invalid token. Disconnecting socket:', socket.id);
-        socket.disconnect();
-        return;
-    }
+  // const onlineUsers = new Map();
 
-    const userId = user.id;
-    
-     console.log(`${userId} connected and is online`);
-  
-     if (!userSockets[userId]) {
-      userSockets[userId] = [];
+  if (!user) {
+    console.log("Invalid token. Disconnecting socket:", socket.id);
+    socket.disconnect();
+    return;
+  }
+
+  const userId = user.id;
+
+  console.log(`${userId} connected and is online`);
+
+  if (!userSockets[userId]) {
+    userSockets[userId] = [];
   }
   userSockets[userId].push(socket.id);
-  
-    onlineUsers.add(user.id);
-    io.emit('onlineUsers', Array.from(onlineUsers));
-    
-    console.log('User connected:', user.id);
-    console.log('Current online users:', onlineUsers);
-  
-   //new
-   socket.on('callUser', ({ receiverId, signalData, from }) => {
+
+  onlineUsers.add(user.id);
+  io.emit("onlineUsers", Array.from(onlineUsers));
+
+  console.log("User connected:", user.id);
+  console.log("Current online users:", onlineUsers);
+
+  //new
+  socket.on("callUser", ({ receiverId, signalData, from }) => {
     const receiverSockets = userSockets[receiverId] || [];
-    receiverSockets.forEach(socketId => {
-        io.to(socketId).emit('incomingCall', { from, signalData });
+    receiverSockets.forEach((socketId) => {
+      io.to(socketId).emit("incomingCall", { from, signalData });
     });
-});
-
-// Handle Call Answering  
-socket.on('answerCall', ({ to, signal }) => {
-    const senderSockets = userSockets[to] || [];
-    senderSockets.forEach(socketId => {
-        io.to(socketId).emit('callAccepted', signal);
-    });
-});
-
-// Handle Call Rejection
-socket.on('rejectCall', ({ to }) => {
-    const senderSockets = userSockets[to] || [];
-    senderSockets.forEach(socketId => {
-        io.to(socketId).emit('callRejected');
-    });
-});
-
-// Handle Call End
-socket.on('endCall', ({ to }) => {
-    const senderSockets = userSockets[to] || [];
-    senderSockets.forEach(socketId => {
-        io.to(socketId).emit('callEnded');
-    });
-});
-
-
-
-
-    socket.on('sendMessage', async ({ senderId, receiverId, messageText, fileUrl, fileType, fileName, messageType, replyTo }) => {
-      try {
-          // Build message payload — support both text and file messages
-          const messagePayload = {
-              sender: senderId,
-              receiver: receiverId,
-              content: messageText || '',
-              messageType: messageType || 'text',
-          };
-
-          // Attach file metadata if present
-          if (fileUrl) {
-              messagePayload.fileUrl = fileUrl;
-              messagePayload.fileType = fileType || null;
-              messagePayload.fileName = fileName || null;
-          }
-
-          // Attach reply-to snapshot if present
-          if (replyTo) {
-              messagePayload.replyTo = replyTo;
-          }
-
-          const message = new Message(messagePayload);
-          await message.save();
-
-          console.log("New message saved:", message);
-
-          const senderSockets = userSockets[senderId] || [];
-          senderSockets.forEach(socketId => {
-              io.to(socketId).emit('receiveMessage', message);
-          });
-
-          const receiverSockets = userSockets[receiverId] || [];
-          receiverSockets.forEach(socketId => {
-              io.to(socketId).emit('receiveMessage', message);
-          });
-
-          console.log(`Message emitted to sender ${senderId} and receiver ${receiverId}`);
-      } catch (error) {
-          console.error("Error handling sendMessage:", error);
-      }
   });
-  
 
-   
-   
-  socket.on('userOffline', (userId) => {
-    console.log('User offline:', userId);
-    onlineUsers.delete(userId);
-    io.emit('onlineUsers', Array.from(onlineUsers));
-});
-      
-  
-     
-    socket.on('typing', ({ senderId, receiverId, isTyping }) => {
-      socket.to(receiverId).emit('displayTyping', { senderId, isTyping });
+  // Handle Call Answering
+  socket.on("answerCall", ({ to, signal }) => {
+    const senderSockets = userSockets[to] || [];
+    senderSockets.forEach((socketId) => {
+      io.to(socketId).emit("callAccepted", signal);
     });
-     
+  });
 
+  // Handle Call Rejection
+  socket.on("rejectCall", ({ to }) => {
+    const senderSockets = userSockets[to] || [];
+    senderSockets.forEach((socketId) => {
+      io.to(socketId).emit("callRejected");
+    });
+  });
 
-//     socket.on('disconnect', () => {
-//       onlineUsers.delete(user.id);
-//       io.emit('onlineUsers', Array.from(onlineUsers));
-//       console.log('User disconnected:', user.id);
-//   });
+  // Handle Call End
+  socket.on("endCall", ({ to }) => {
+    const senderSockets = userSockets[to] || [];
+    senderSockets.forEach((socketId) => {
+      io.to(socketId).emit("callEnded");
+    });
+  });
 
+  socket.on(
+    "sendMessage",
+    async ({
+      senderId,
+      receiverId,
+      messageText,
+      fileUrl,
+      fileType,
+      fileName,
+      messageType,
+      replyTo,
+    }) => {
+      try {
+        // Build message payload — support both text and file messages
+        const messagePayload = {
+          sender: senderId,
+          receiver: receiverId,
+          content: messageText || "",
+          messageType: messageType || "text",
+        };
 
-//pls check need to check scket id=== arrya matching socket id in multiple device case
+        // Attach file metadata if present
+        if (fileUrl) {
+          messagePayload.fileUrl = fileUrl;
+          messagePayload.fileType = fileType || null;
+          messagePayload.fileName = fileName || null;
+        }
 
-  socket.on('disconnect', () => {
-  // Remove disconnected socket ID
-  userSockets[user.id] = (userSockets[user.id] || [])
-    .filter(socketId => socketId !== socket.id);
+        // Attach reply-to snapshot if present
+        if (replyTo) {
+          messagePayload.replyTo = replyTo;
+        }
 
-  // Mark user offline only if no connections remain
-  if (userSockets[user.id].length === 0) {
-    delete userSockets[user.id];
-    onlineUsers.delete(user.id);
-  }
+        const message = new Message(messagePayload);
+        await message.save();
 
-  io.emit('onlineUsers', Array.from(onlineUsers));
+        console.log("New message saved:", message);
 
-  console.log('User disconnected:', user.id);
+        const senderSockets = userSockets[senderId] || [];
+        senderSockets.forEach((socketId) => {
+          io.to(socketId).emit("receiveMessage", message);
+        });
+
+        const receiverSockets = userSockets[receiverId] || [];
+        receiverSockets.forEach((socketId) => {
+          io.to(socketId).emit("receiveMessage", message);
+        });
+
+        console.log(
+          `Message emitted to sender ${senderId} and receiver ${receiverId}`
+        );
+      } catch (error) {
+        console.error("Error handling sendMessage:", error);
+      }
+    }
+  );
+
+  socket.on("userOffline", (userId) => {
+    console.log("User offline:", userId);
+    onlineUsers.delete(userId);
+    io.emit("onlineUsers", Array.from(onlineUsers));
+  });
+
+  socket.on("typing", ({ senderId, receiverId, isTyping }) => {
+    socket.to(receiverId).emit("displayTyping", { senderId, isTyping });
+  });
+
+  //     socket.on('disconnect', () => {
+  //       onlineUsers.delete(user.id);
+  //       io.emit('onlineUsers', Array.from(onlineUsers));
+  //       console.log('User disconnected:', user.id);
+  //   });
+
+  //pls check need to check scket id=== arrya matching socket id in multiple device case
+
+  socket.on("disconnect", () => {
+    // Remove disconnected socket ID
+    userSockets[user.id] = (userSockets[user.id] || []).filter(
+      (socketId) => socketId !== socket.id
+    );
+
+    // Mark user offline only if no connections remain
+    if (userSockets[user.id].length === 0) {
+      delete userSockets[user.id];
+      onlineUsers.delete(user.id);
+    }
+
+    io.emit("onlineUsers", Array.from(onlineUsers));
+
+    console.log("User disconnected:", user.id);
+  });
 });
-})
-
-
-
-  
