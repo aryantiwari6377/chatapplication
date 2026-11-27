@@ -350,13 +350,26 @@ io.on("connection", (socket) => {
       messageType,
       replyTo,
     }) => {
+      console.log("sendMessage received:", {
+        senderId,
+        receiverId,
+        messageType: messageType || "text",
+        hasFile: Boolean(fileUrl),
+        fileName: fileName || null,
+      });
+
       try {
+        if (!senderId || !receiverId) {
+          console.error("sendMessage missing senderId or receiverId");
+          return;
+        }
+
         // Build message payload — support both text and file messages
         const messagePayload = {
           sender: senderId,
           receiver: receiverId,
           content: messageText || "",
-          messageType: messageType || "text",
+          messageType: messageType || (fileUrl ? "file" : "text"),
         };
 
         // Attach file metadata if present
@@ -374,7 +387,7 @@ io.on("connection", (socket) => {
         const message = new Message(messagePayload);
         await message.save();
 
-        console.log("New message saved:", message);
+        console.log("New message saved:", message._id, message.messageType);
 
         const senderSockets = userSockets[senderId] || [];
         senderSockets.forEach((socketId) => {

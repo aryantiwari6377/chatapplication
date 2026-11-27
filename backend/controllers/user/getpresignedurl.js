@@ -44,10 +44,12 @@ export const getPresignedUrl = async (req, res) => {
     // Sanitise the original filename — keep only the extension
     const ext = path.extname(fileName).toLowerCase().replace(/[^a-z0-9.]/g, '');
 
-    // Check allowed type — use prefix match for audio (handles codec suffixes like audio/webm;codecs=opus)
-    const typeAllowed = ALLOWED_TYPES.has(fileType) || [...ALLOWED_TYPES].some(t => fileType.startsWith(t));
+    // Check allowed type against normalised MIME (handles codec suffixes)
+    const typeAllowed =
+      ALLOWED_TYPES.has(normalizedType) ||
+      [...ALLOWED_TYPES].some((t) => normalizedType.startsWith(t));
     if (!typeAllowed) {
-      return res.status(400).json({ message: `File type "${fileType}" is not allowed.` });
+      return res.status(400).json({ message: `File type "${normalizedType}" is not allowed.` });
     }
     if (fileSize > MAX_SIZE_BYTES) {
       return res.status(400).json({ message: `File size exceeds the 10 MB limit.` });

@@ -17,6 +17,7 @@ import s1 from '../images/send4.png';
 import s2 from '../images/send1.jpeg';
 import EmojiPicker from 'emoji-picker-react';
 import { uploadFileToS3 } from '../Services/user/uploadFile';
+import { getSocketUrl } from '../Services/socketUrl';
 import Navbar from '../Components/Navbar';
 
 window.process = process;
@@ -167,23 +168,16 @@ const stopRingSound = () => {
   const userToken = localStorage.getItem('token');
 
   useEffect(() => {
-   const SOCKET_URL = process.env.REACT_APP_API_URL;
+    const SOCKET_URL = getSocketUrl();
     if (!socketRef.current) {
       socketRef.current = io(SOCKET_URL, {
         query: { token: userToken },
       });
 
       socketRef.current.on('connect', () => {
-        console.log('Socket connected:', socketRef.current.id);
+        console.log('Socket connected:', socketRef.current.id, 'url:', SOCKET_URL);
       });
 
-      // socketRef.current.on('receiveMessage', (message) => {
-      //   console.log("listen receive",message);
-      //   setMessages((prevMessages) => [...prevMessages, message]);
-      //   console.log("newMessage",newMessage);
-      //   setNewMessage("");
-
-      // });
       socketRef.current.on('receiveMessage', (message) => {
         const messageSenderId = message.senderId ?? message.sender;
         const isOwnMessage = String(messageSenderId) === String(senderIdRef.current);
@@ -200,9 +194,8 @@ const stopRingSound = () => {
           timestamp: message.timestamp || new Date().toISOString(),
         }));
 
-        // Text messages: sender added them optimistically — skip the socket echo.
-        // File/image/audio messages: no optimistic add was done — show socket response for everyone.
-        if (isOwnMessage && (message.messageType === 'text' || !message.messageType)) return;
+        // Sender already added the message optimistically — skip own echo for all types.
+        if (isOwnMessage) return;
 
         setMessages((prevMessages) => [...prevMessages, message]);
       });
@@ -317,34 +310,57 @@ const stopRingSound = () => {
     }
   };
 
+  const ensureSocketConnected = () =>
+    new Promise((resolve, reject) => {
+      const socket = socketRef.current;
+      if (!socket) {
+        reject(new Error('Socket is not initialized'));
+        return;
+      }
+      if (socket.connected) {
+        resolve(socket);
+        return;
+      }
+      const onConnect = () => {
+        cleanup();
+        resolve(socket);
+      };
+      const onTimeout = () => {
+        cleanup();
+        reject(new Error('Socket reconnect timed out'));
+      };
+      const cleanup = () => {
+        socket.off('connect', onConnect);
+        clearTimeout(timer);
+      };
+      const timer = setTimeout(onTimeout, 8000);
+      socket.once('connect', onConnect);
+      socket.connect();
+    });
+
   const sendMessage = async () => {
     // ── Send staged file if one is waiting ──────────────────────────────────
     if (stagedFile) {
       try {
+        if (!senderid) {
+          alert('Still loading chat. Please try again in a moment.');
+          return;
+        }
+
         setUploadProgress(0);
 
-        const { publicUrl, fileType, fileName } = await uploadFileToS3(stagedFile.file, (pct) => {
-          setUploadProgress(pct);
-        });
+        const { publicUrl, fileType, fileName } =
+          await uploadFileToS3(stagedFile.file, (pct) => {
+            setUploadProgress(pct);
+          });
 
-        setUploadProgress(null);
-        setStagedFile(null);
+        const msgType = fileType.startsWith('image/')
+          ? 'image'
+          : fileType.startsWith('audio/')
+          ? 'audio'
+          : 'file';
 
-        const msgType = fileType.startsWith('image/') ? 'image'
-                      : fileType.startsWith('audio/') ? 'audio'
-                      : 'file';
-
-        const previewText = msgType === 'image' ? '📷 Photo'
-                          : msgType === 'audio' ? '🎤 Voice message'
-                          : `📎 ${fileName || 'File'}`;
-
-        dispatch(setLatestMessage({
-          friendId: id,
-          message: previewText,
-          timestamp: new Date().toISOString(),
-        }));
-
-        socketRef.current.emit('sendMessage', {
+        const messageData = {
           senderId: senderid,
           receiverId: id,
           messageText: '',
@@ -354,22 +370,50 @@ const stopRingSound = () => {
           messageType: msgType,
           timestamp: new Date().toISOString(),
           ...(replyTo ? { replyTo } : {}),
-        });
+        };
+
+        // Show immediately for the sender
+        setMessages((prev) => [...prev, messageData]);
+
+        dispatch(setLatestMessage({
+          friendId: id,
+          message:
+            msgType === 'image'
+              ? '📷 Photo'
+              : msgType === 'audio'
+              ? '🎤 Voice message'
+              : `📎 ${fileName}`,
+          timestamp: messageData.timestamp,
+        }));
+
+        const socket = await ensureSocketConnected();
+        socket.emit('sendMessage', messageData);
+
+        if (stagedFile.previewUrl) URL.revokeObjectURL(stagedFile.previewUrl);
+        setStagedFile(null);
         setReplyTo(null);
       } catch (err) {
-        setUploadProgress(null);
         console.error('File upload failed:', err);
-        alert(err?.response?.data?.message || 'File upload failed. Please try again.');
+        alert(err?.response?.data?.message || err?.message || 'File upload failed');
+      } finally {
+        setUploadProgress(null);
       }
+
       return;
     }
 
     // ── Send plain text ──────────────────────────────────────────────────────
     if (!newMessage.trim()) return;
+    if (!senderid) {
+      alert('Still loading chat. Please try again in a moment.');
+      return;
+    }
+
     const messageData = {
       receiverId: id,
       messageText: newMessage,
       senderId: senderid,
+      messageType: 'text',
       timestamp: new Date().toISOString(),
       ...(replyTo ? { replyTo } : {}),
     };
@@ -381,9 +425,17 @@ const stopRingSound = () => {
     }));
 
     setMessages((prevMessages) => [...prevMessages, messageData]);
-    socketRef.current.emit('sendMessage', messageData);
+
+    try {
+      const socket = await ensureSocketConnected();
+      socket.emit('sendMessage', messageData);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert(err?.message || 'Failed to send message. Please try again.');
+    }
+
     setNewMessage('');
-    setReplyTo(null); // clear reply after sending
+    setReplyTo(null);
   };
 
 
@@ -1238,6 +1290,7 @@ const dateStr = callDate.toLocaleString('en-IN', {
       >
         📸 Capture
       </button>
+      
       <button
         onClick={closeCamera}
         className="bg-[rgba(192,52,48,255)] text-white font-bold px-6 py-2 rounded-full text-sm"

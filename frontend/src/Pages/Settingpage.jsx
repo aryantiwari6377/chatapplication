@@ -352,7 +352,7 @@ function Settingpage() {
                   <p className="text-xs text-gray-400">Log out of this browser across all active tabs</p>
                 </div>
                 <button
-                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-xl shadow-md transition"
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-2 md:px-4 py-2 rounded-xl shadow-md transition"
                   onClick={handleLogout}
                 >
                   <FontAwesomeIcon icon={faRightFromBracket} />

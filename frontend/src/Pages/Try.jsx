@@ -16,6 +16,7 @@ import { loadingHandle, friendList, setLatestMessage } from '../Redux/slices/loa
 import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 import { io } from 'socket.io-client';
+import { getSocketUrl } from '../Services/socketUrl';
 
 
 const Try = () => {
@@ -199,8 +200,7 @@ const Try = () => {
   useEffect(() => {
     const userToken = localStorage.getItem('token');
     if (!userToken) return;
- const SOCKET_URL = process.env.REACT_APP_API_URL;
-    const socket = io( SOCKET_URL, { query: { token: userToken } });
+    const socket = io(getSocketUrl(), { query: { token: userToken } });
 
     socket.on('receiveMessage', (message) => {
       const friendId = message.sender ?? message.senderId;
